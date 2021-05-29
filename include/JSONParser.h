@@ -1,7 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+
 #include "JSONConfig.h"
+#include "JSONErrors.h"
 
 #define JSONSTREAM_STACK_LIMIT JSONSTREAM_MAX_DEPTH + 5
 
@@ -62,6 +64,9 @@ private:
     stack_int_t m_buffer_level, m_stack_top;
     uint8_t m_parse_flags;
 
+    uint8_t unicode_idx;
+    uint16_t unicode_codepoint;
+
     inline void push(Type state);
     inline Type pop();
     inline Type peek();
@@ -70,9 +75,9 @@ private:
     inline void ascend();
     inline void clear_data();
 
-    inline void append_data(char c);
-    inline void set_data(int i);
-    inline void increment_data();
+    inline void buffer_append_char(char c);
+    inline void buffer_assign_int(int i);
+    inline void buffer_increment_int();
     inline char buffer_last();
     inline char buffer_first();
 
@@ -87,22 +92,21 @@ private:
     void parse_false(char c);
     void parse_null(char c);
     void parse_array(char c);
-
-    void parse(char c);
 public:
     RawParser();
     virtual ~RawParser();
 
     void reset();
+    void parse(char c);
 
-    void write(char c);
+    virtual void write(char c);
     void dump_state();
 
 #if JSONSTREAM_TRIGGER_DOCUMENT_BEGIN
-    virtual void on_document_begin(const Type type) = 0;
+    virtual void on_document_begin(Type type) = 0;
 #endif
 #if JSONSTREAM_TRIGGER_DOCUMENT_END
-    virtual void on_document_end(const Type type) = 0;
+    virtual void on_document_end(Type type) = 0;
 #endif
 
 #if JSONSTREAM_TRIGGER_ARRAY_BEGIN
@@ -130,6 +134,8 @@ public:
     virtual void on_true(const Path& path) = 0;
     virtual void on_false(const Path& path) = 0;
     virtual void on_null(const Path& path) = 0;
+
+    virtual void on_error(ErrorCode error_code) = 0;
 };
 
 class Parser : public RawParser {
@@ -138,13 +144,10 @@ public:
     virtual void on_true(const Path& path) override;
     virtual void on_false(const Path& path) override;
 
-    virtual void on_string(const Path& path, const char *value) = 0;
     virtual void on_int(const Path& path, int value) = 0;
     virtual void on_float(const Path& path, float value) = 0;
     virtual void on_boolean(const Path path, bool value) = 0;
     virtual void on_null(const Path& path) = 0;
-    virtual void on_empty_array(const Path& path) = 0;
-    virtual void on_empty_object(const Path& path) = 0;
 };
 
 class Path {

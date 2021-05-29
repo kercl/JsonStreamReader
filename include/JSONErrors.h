@@ -3,8 +3,13 @@
 namespace json {
 
 enum ErrorCode {
-    ErrorOutOfMemory = 0,
-    
+    NoError = 0,
+    ErrorOutOfMemory,
+    ErrorUnexpectedCharacter,
+    ErrorStackEmpty,
+    ErrorBufferEmpty,
+    ErrorNotImplemented,
+    ErrorUnknownEscapeCharacter
 };
 
-};
+}
