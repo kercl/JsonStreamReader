@@ -5,12 +5,12 @@
 
 #if defined __has_cpp_attribute
     #if __has_cpp_attribute(fallthrough)
-        #define SUPRESS_FALLTHROUGH_WARNING [[fallthrough]];
+        #define SUPPRESS_FALLTHROUGH_WARNING [[fallthrough]];
     #else
-        #define SUPRESS_FALLTHROUGH_WARNING
+        #define SUPPRESS_FALLTHROUGH_WARNING
     #endif
 #else
-    #define SUPRESS_FALLTHROUGH_WARNING
+    #define SUPPRESS_FALLTHROUGH_WARNING
 #endif
 
 #define CHAR_ESCAPED     (1 << 0)
@@ -36,10 +36,10 @@
     }                      \
 
 
-#if JSONSTREAM_CERR_ERROR_MSG
+#ifdef JSONSTREAM_CERR_ERROR_MSG
 #   define ERROR2(err_code, ret) \
         FLAG_SET(DOCUMENT_INVALID); \
-        std::cerr << "(" << __LINE__ << ") Error code " << err_code << std::endl; \
+        std::cerr << __FILE__ << ":" << __LINE__ << ": error: " << err_code << std::endl; \
         on_error(ErrorUnexpectedCharacter); \
         return ret;
 #else
@@ -93,7 +93,7 @@ bool json::RawParser::is_whitespace(char c) {
 }
 
 inline void json::RawParser::push(Type structure) {
-    if(m_stack_top == JSONSTREAM_STACK_LIMIT) {
+    if(m_stack_top == JSONSTREAM_STACK_LIMIT - 1) {
         ERROR(ErrorOutOfMemory)
     }
 
@@ -159,7 +159,7 @@ inline char json::RawParser::buffer_first() {
 }
 
 inline void json::RawParser::descend() {
-    if(m_buffer_level == JSONSTREAM_MAX_DEPTH) {
+    if(m_buffer_level == JSONSTREAM_MAX_DEPTH - 1) {
         ERROR(ErrorOutOfMemory);
     }
 
@@ -178,28 +178,6 @@ inline void json::RawParser::clear_data() {
     m_buffer_sizes[m_buffer_level] = 0;
 }
 
-void json::RawParser::parse_document(char c) {
-    SKIP_WHITESPACES(c)
-
-    switch(c) {
-    case '{':
-        push(DocumentObject);
-        push(ObjectBegin);
-#if JSONSTREAM_TRIGGER_DOCUMENT_BEGIN
-        on_document_begin(Object);
-#endif
-        return;
-    case '[':
-        push(DocumentArray);
-        push(ArrayBegin);
-#if JSONSTREAM_TRIGGER_DOCUMENT_BEGIN
-        on_document_begin(Array);
-#endif
-        parse_array(c);
-        return;
-    }
-    ERROR(ErrorUnexpectedCharacter);
-}
 
 void json::RawParser::parse_object(char c) {
     SKIP_WHITESPACES(c)
@@ -207,21 +185,18 @@ void json::RawParser::parse_object(char c) {
     switch(pop()) {
     case ObjectBegin:
         if(c == '}') {
-#if JSONSTREAM_TRIGGER_OBJECT_EMPTY
-            on_object_empty(Path(this));
-#endif
-            if(peek() != DocumentObject) {
+            if(m_stack_top == 0) {
+                FLAG_SET(DOCUMENT_ENDED);
                 ascend();
             }
             else {
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
-                on_document_end(Object);
-                FLAG_SET(DOCUMENT_ENDED);
-#endif
+                ascend();
             }
+            TRIGGER_OBJECT_EMPTY(Path(this));
+            TRIGGER_OBJECT_END(Path(this));
             return;
         }
-        SUPRESS_FALLTHROUGH_WARNING
+        SUPPRESS_FALLTHROUGH_WARNING
     case ObjectKey:
         EXPECT(c == '\"');
         push(ObjectColon);
@@ -236,17 +211,12 @@ void json::RawParser::parse_object(char c) {
         return;
     case Object:
         if(c == '}') {
-#if JSONSTREAM_TRIGGER_OBJECT_END
-            on_object_end(Path(this));
-#endif
-            if(peek() != DocumentObject) {
-                ascend();
-            }
-            else {
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
-                on_document_end(Object);
-#endif
+            if(m_stack_top == 0) {
                 FLAG_SET(DOCUMENT_ENDED);
+                TRIGGER_OBJECT_END(Path(this));
+            } else {
+                ascend();
+                TRIGGER_OBJECT_END(Path(this));
             }
             return;
         }
@@ -258,6 +228,50 @@ void json::RawParser::parse_object(char c) {
     }
 }
 
+void json::RawParser::parse_array(char c) {
+    SKIP_WHITESPACES(c)
+
+    if(peek() == ArrayBegin) {
+        pop();
+        if(c == ']') {
+            TRIGGER_ARRAY_EMPTY(Path(this));
+            TRIGGER_ARRAY_END(Path(this));
+
+            if(m_stack_top == 0) {
+                FLAG_SET(DOCUMENT_ENDED);
+            } else {
+                ascend();
+            }
+            return;
+        }
+        EXPECT(c != ',');
+        push(Array);
+        push(Value);
+        buffer_assign_int(0);
+        descend();
+        parse_value(c);
+        return;
+    }
+
+    if(c == ']') {
+        pop();
+        if(m_stack_top == 0) {
+            FLAG_SET(DOCUMENT_ENDED);
+            TRIGGER_ARRAY_END(Path(this));
+            TRIGGER_DOCUMENT_END(Array);
+        } else {
+            ascend();
+            TRIGGER_ARRAY_END(Path(this));
+        }
+        return;
+    }
+
+    EXPECT(c == ',');
+    push(Value);
+    buffer_increment_int();
+    descend();
+}
+
 void json::RawParser::parse_value(char c) {
     SKIP_WHITESPACES(c)
 
@@ -265,11 +279,12 @@ void json::RawParser::parse_value(char c) {
     case '{':
         pop();
         push(ObjectBegin);
+        TRIGGER_OBJECT_BEGIN(Path(this));
         return;
     case '[':
         pop();
         push(ArrayBegin);
-        parse_array(c);
+        TRIGGER_ARRAY_BEGIN(Path(this));
         return;
     case '-':
     case '0':
@@ -299,22 +314,7 @@ void json::RawParser::parse_value(char c) {
         parse_null(c);
         return;
     default:
-        pop();
-        std::cout << "retrying " << c << std::endl;
-        dump_state();
-        ascend();
-        parse(c);
-//     case ']':
-//         pop();
-//         ascend();
-//         if(buffer_as_int() > 0) {
-//             EXPECT(peek() == Array && m_buffer_sizes[m_buffer_level + 1] > 0);
-//         }
-// #if JSONSTREAM_TRIGGER_OBJECT_EMPTY
-//         on_array_empty(Path(this));
-// #endif
-//         pop();
-        return;
+        break;
     }
 
     ERROR(ErrorUnexpectedCharacter)
@@ -489,15 +489,6 @@ void json::RawParser::parse_number(char c) {
 
     buffer_append_char('\0');
     pop();
-    
-    if(peek() == Value) {
-        pop();
-        on_number(Path(this), m_buffers[m_buffer_level]);
-        ascend();
-        parse(c);
-    }
-
-    parse(c);
 }
 
 void json::RawParser::parse_true(char c) {
@@ -584,82 +575,44 @@ void json::RawParser::parse_null(char c) {
     buffer_append_char(c);
 }
 
-void json::RawParser::parse_array(char c) {
-    SKIP_WHITESPACES(c)
-
-    std::cout << "parsing array: " << c << std::endl;
-
-    if(peek() == ArrayBegin) {
-        EXPECT(c == '[');
-        pop();
-        push(Array);
-        push(Value);
-#if JSONSTREAM_TRIGGER_ARRAY_END
-        on_array_begin(Path(this));
-#endif
-        buffer_assign_int(0);
-        descend();
-        return;
-    }
-
-    if(c == ']') {
-        pop();
-        if(buffer_as_int() == 0) {
-#if JSONSTREAM_TRIGGER_OBJECT_EMPTY
-            on_array_empty(Path(this));
-#endif
-        }
-        if(peek() != DocumentArray) {
-#if JSONSTREAM_TRIGGER_ARRAY_END
-            on_array_end(Path(this));
-#endif
-            ascend();
-        }
-        else {
-#if JSONSTREAM_TRIGGER_ARRAY_END
-            on_array_end(Path(this));
-#endif
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
-            on_document_end(Array);
-#endif
-            std::cout << "array ended" << std::endl;
-            FLAG_SET(DOCUMENT_ENDED);
-        }
-        return;
-    }
-
-    EXPECT(c == ',');
-    push(Value);
-    buffer_increment_int();
-    descend();
-}
-
 void json::RawParser::parse(char c) {
     if(FLAG_IS_SET(DOCUMENT_INVALID)) {
         return;
     }
 
-    std::cout << "flag doc ended: " << FLAG_IS_SET(DOCUMENT_ENDED) << " < " << c << std::endl;
     if(FLAG_IS_SET(DOCUMENT_ENDED)) {
         EXPECT_WHITESPACE(c);
         return;
     }
 
     if(m_stack_top == 0) {
-        parse_document(c);
-        return;
+        SKIP_WHITESPACES(c);
+
+        if(c == '[') {
+            TRIGGER_DOCUMENT_BEGIN(Array);
+            TRIGGER_ARRAY_BEGIN(Path(this));
+            push(ArrayBegin);
+            return;
+        }
+        if(c == '{') {
+            TRIGGER_DOCUMENT_BEGIN(Object);
+            TRIGGER_OBJECT_BEGIN(Path(this));
+            push(ObjectBegin);
+            return;
+        }
+        ERROR(ErrorUnexpectedCharacter);
     }
 
     switch(peek()) {
-    case DocumentObject:
-    case DocumentArray:
-        //EXPECT_WHITESPACE(c);
-        break;
     case ObjectBegin:
     case ObjectKey:
     case ObjectColon:
     case Object:
         parse_object(c);
+        break;
+    case ArrayBegin:
+    case Array:
+        parse_array(c);
         break;
     case Value:
         parse_value(c);
@@ -675,16 +628,12 @@ void json::RawParser::parse(char c) {
         break;
     case Number:
         parse_number(c);
-        // if(peek() == Value) {
-        //     pop();
-        //     on_number(Path(this), m_buffers[m_buffer_level]);
-        //     ascend();
-        //     parse(c);
-        // }
-        break;
-    case ArrayBegin:
-    case Array:
-        parse_array(c);
+        if(peek() == Value) {
+            pop();
+            on_number(Path(this), m_buffers[m_buffer_level]);
+            ascend();
+            parse(c);
+        }
         break;
     case ValueTrue:
         parse_true(c);
@@ -724,8 +673,7 @@ void json::RawParser::end_of_transmission() {
         return;
     }
 
-    ASSERT(peek() == DocumentArray || peek() == DocumentObject,
-        ErrorDocumentNotClosed);
+    ASSERT(FLAG_IS_SET(DOCUMENT_ENDED), ErrorDocumentNotClosed);
 
     reset();
 }
@@ -733,23 +681,23 @@ void json::RawParser::end_of_transmission() {
 json::Path::Path(const json::RawParser *parser) : m_parser(parser) {}
 
 bool json::Path::is_name(unsigned int i) const {
-    return i >= m_parser->m_buffer_level
+    return i > m_parser->m_buffer_level
         ? false
-        : m_parser->m_stack[i + 1] == Object;
+        : m_parser->m_stack[i] == Object;
 }
 
 bool json::Path::is_index(unsigned int i) const {
-    return i >= m_parser->m_buffer_level
+    return i > m_parser->m_buffer_level
         ? false
-        : m_parser->m_stack[i + 1] == Array;
+        : m_parser->m_stack[i] == Array;
 }
 
 int json::Path::as_index(unsigned int i) const {
-    if(i >= m_parser->m_buffer_level) {
+    if(i > m_parser->m_buffer_level) {
         return 0;
     }
 
-    if(m_parser->m_stack[i + 1] == Array)
+    if(m_parser->m_stack[i] == Array)
     {
         return *(int*)&m_parser->m_buffers[i][0];
     }
@@ -758,11 +706,11 @@ int json::Path::as_index(unsigned int i) const {
 }
 
 const char* json::Path::as_name(unsigned int i) const {
-    if(i >= m_parser->m_buffer_level) {
+    if(i > m_parser->m_buffer_level) {
         return nullptr;
     }
 
-    if(m_parser->m_stack[i + 1] == Object)
+    if(m_parser->m_stack[i] == Object)
     {
         return m_parser->m_buffers[i];
     }
@@ -771,7 +719,7 @@ const char* json::Path::as_name(unsigned int i) const {
 }
 
 unsigned int json::Path::key_length(unsigned int i) const {
-    if(i >= m_parser->m_buffer_level) {
+    if(i > m_parser->m_buffer_level || (m_parser->m_parse_flags & DOCUMENT_ENDED)) {
         return 0;
     }
 
@@ -779,7 +727,10 @@ unsigned int json::Path::key_length(unsigned int i) const {
 }
 
 unsigned int json::Path::size() const {
-    return m_parser->m_buffer_level;
+    if(m_parser->m_parse_flags & DOCUMENT_ENDED) {
+        return 0;
+    }
+    return m_parser->m_buffer_level + 1;
 }
 
 
@@ -794,11 +745,11 @@ unsigned int json::Path::size() const {
 
 
 
-const char _dbg_struct_names[json::Undefined][40] = {
+const char _dbg_struct_names[json::Undefined + 1][40] = {
 "DocumentObject",
 "DocumentArray",
-"ObjectBegin",
 "Object",
+"ObjectBegin",
 "ObjectKey",
 "ObjectColon",
 "Value",
@@ -809,7 +760,8 @@ const char _dbg_struct_names[json::Undefined][40] = {
 "String",
 "ValueTrue",
 "ValueFalse",
-"ValueNull"
+"ValueNull",
+"Undefined"
 };
 
 void json::RawParser::dump_state() {

@@ -22,49 +22,49 @@ class TestParser : public json::RawParser {
 public:
     TestParser() : m_last_error(json::NoError) {}
 
-#if JSONSTREAM_TRIGGER_DOCUMENT_BEGIN
+#ifdef JSONSTREAM_ACT_ON_DOCUMENT_BEGIN
     void on_document_begin(json::Type type) override {
         SUPPRESS_UNUSED(type);
     }
 #endif
 
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
+#ifdef JSONSTREAM_ACT_ON_DOCUMENT_END
     void on_document_end(json::Type type) override {
         SUPPRESS_UNUSED(type);
     }
 #endif
 
-#if JSONSTREAM_TRIGGER_ARRAY_BEGIN
+#ifdef JSONSTREAM_ACT_ON_ARRAY_BEGIN
     void on_array_begin(const json::Path& path) override {
         SUPPRESS_UNUSED(path);
     }
 #endif
 
-#if JSONSTREAM_TRIGGER_ARRAY_EMPTY
+#ifdef JSONSTREAM_ACT_ON_ARRAY_EMPTY
     void on_array_empty(const json::Path& path) override {
         SUPPRESS_UNUSED(path);
     }
 #endif
 
-#if JSONSTREAM_TRIGGER_ARRAY_END
+#ifdef JSONSTREAM_ACT_ON_ARRAY_END
     void on_array_end(const json::Path& path) override {
         SUPPRESS_UNUSED(path);
     }
 #endif
 
-#if JSONSTREAM_TRIGGER_OBJECT_BEGIN
+#ifdef JSONSTREAM_ACT_ON_OBJECT_BEGIN
     void on_object_begin(const json::Path& path) override {
         SUPPRESS_UNUSED(path);
     }
 #endif
 
-#if JSONSTREAM_TRIGGER_OBJECT_EMPTY
+#ifdef JSONSTREAM_ACT_ON_OBJECT_EMPTY
     void on_object_empty(const json::Path& path) override {
         SUPPRESS_UNUSED(path);
     }
 #endif
 
-#if JSONSTREAM_TRIGGER_OBJECT_END
+#ifdef JSONSTREAM_ACT_ON_OBJECT_END
     void on_object_end(const json::Path& path) override {
         SUPPRESS_UNUSED(path);
     }

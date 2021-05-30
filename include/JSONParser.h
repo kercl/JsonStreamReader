@@ -5,7 +5,7 @@
 #include "JSONConfig.h"
 #include "JSONErrors.h"
 
-#define JSONSTREAM_STACK_LIMIT JSONSTREAM_MAX_DEPTH + 5
+#define JSONSTREAM_STACK_LIMIT JSONSTREAM_MAX_DEPTH + 3
 
 static_assert(JSONSTREAM_BUFFER_LIMIT >= sizeof(int),
     "JSON_MAX_DATA_LENGTH needs to be at least "
@@ -31,6 +31,79 @@ typedef uint16_t stack_int_t;
 typedef uint32_t stack_int_t;
 #else
 typedef uint64_t stack_int_t;
+#endif
+
+#ifdef JSONSTREAM_ACT_ON_DOCUMENT_BEGIN
+#   define TRIGGER_DOCUMENT_BEGIN(type) \
+        on_document_begin(type)
+    #define DEF_TRIGGER_DOCUMENT_BEGIN \
+        virtual void on_document_begin(Type type) = 0
+#else
+#   define TRIGGER_DOCUMENT_BEGIN
+#   define DEF_TRIGGER_DOCUMENT_BEGIN
+#endif
+#ifdef JSONSTREAM_ACT_ON_DOCUMENT_END
+#   define TRIGGER_DOCUMENT_END(type) \
+        on_document_end(type)
+#   define DEF_TRIGGER_DOCUMENT_END \
+        virtual void on_document_end(Type type) = 0
+#else
+#   define TRIGGER_DOCUMENT_END
+#   define DEF_TRIGGER_DOCUMENT_END
+#endif
+#ifdef JSONSTREAM_ACT_ON_OBJECT_BEGIN
+#   define TRIGGER_OBJECT_BEGIN(path) \
+        on_object_begin(path)
+    #define DEF_TRIGGER_OBJECT_BEGIN \
+        virtual void on_object_begin(const Path& path) = 0
+#else
+#   define TRIGGER_OBJECT_BEGIN
+#   define DEF_TRIGGER_OBJECT_BEGIN
+#endif
+#ifdef JSONSTREAM_ACT_ON_OBJECT_END
+#   define TRIGGER_OBJECT_END(path) \
+        on_object_end(path)
+    #define DEF_TRIGGER_OBJECT_END \
+        virtual void on_object_end(const Path& path) = 0
+#else
+#   define TRIGGER_OBJECT_END
+#   define DEF_TRIGGER_OBJECT_END
+#endif
+#ifdef JSONSTREAM_ACT_ON_OBJECT_EMPTY
+#   define TRIGGER_OBJECT_EMPTY(path) \
+        on_object_empty(path)
+    #define DEF_TRIGGER_OBJECT_EMPTY \
+        virtual void on_object_empty(const Path& path) = 0
+#else
+#   define TRIGGER_OBJECT_EMPTY
+#   define DEF_TRIGGER_OBJECT_EMPTY
+#endif
+#ifdef JSONSTREAM_ACT_ON_ARRAY_BEGIN
+#   define TRIGGER_ARRAY_BEGIN(path) \
+        on_array_begin(path)
+    #define DEF_TRIGGER_ARRAY_BEGIN \
+        virtual void on_array_begin(const Path& path) = 0
+#else
+#   define TRIGGER_ARRAY_BEGIN
+#   define DEF_TRIGGER_ARRAY_BEGIN
+#endif
+#ifdef JSONSTREAM_ACT_ON_ARRAY_END
+#   define TRIGGER_ARRAY_END(path) \
+        on_array_end(path)
+    #define DEF_TRIGGER_ARRAY_END \
+        virtual void on_array_end(const Path& path) = 0
+#else
+#   define TRIGGER_ARRAY_END
+#   define DEF_TRIGGER_ARRAY_END
+#endif
+#ifdef JSONSTREAM_ACT_ON_ARRAY_EMPTY
+#   define TRIGGER_ARRAY_EMPTY(path) \
+        on_array_empty(path)
+    #define DEF_TRIGGER_ARRAY_EMPTY \
+        virtual void on_array_empty(const Path& path) = 0
+#else
+#   define TRIGGER_ARRAY_EMPTY
+#   define DEF_TRIGGER_ARRAY_EMPTY
 #endif
 
 enum Type: uint8_t {
@@ -84,7 +157,6 @@ private:
 
     bool is_whitespace(char c);
 
-    void parse_document(char c);
     void parse_object(char c);
     void parse_value(char c);
     void parse_string(char c);
@@ -104,32 +176,14 @@ public:
     virtual void write(char c);
     void dump_state();
 
-#if JSONSTREAM_TRIGGER_DOCUMENT_BEGIN
-    virtual void on_document_begin(Type type) = 0;
-#endif
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
-    virtual void on_document_end(Type type) = 0;
-#endif
-
-#if JSONSTREAM_TRIGGER_ARRAY_BEGIN
-    virtual void on_array_begin(const Path& path) = 0;
-#endif
-#if JSONSTREAM_TRIGGER_ARRAY_EMPTY
-    virtual void on_array_empty(const Path& path) = 0;
-#endif
-#if JSONSTREAM_TRIGGER_ARRAY_END
-    virtual void on_array_end(const Path& path) = 0;
-#endif
-
-#if JSONSTREAM_TRIGGER_OBJECT_BEGIN
-    virtual void on_object_begin(const Path& path) = 0;
-#endif
-#if JSONSTREAM_TRIGGER_OBJECT_EMPTY
-    virtual void on_object_empty(const Path& path) = 0;
-#endif
-#if JSONSTREAM_TRIGGER_OBJECT_END
-    virtual void on_object_end(const Path& path) = 0;
-#endif
+    DEF_TRIGGER_DOCUMENT_BEGIN;
+    DEF_TRIGGER_DOCUMENT_END;
+    DEF_TRIGGER_OBJECT_BEGIN;
+    DEF_TRIGGER_OBJECT_END;
+    DEF_TRIGGER_OBJECT_EMPTY;
+    DEF_TRIGGER_ARRAY_BEGIN;
+    DEF_TRIGGER_ARRAY_END;
+    DEF_TRIGGER_ARRAY_EMPTY;
 
     virtual void on_string(const Path& path, const char *value) = 0;
     virtual void on_number(const Path& path, const char *str) = 0;
