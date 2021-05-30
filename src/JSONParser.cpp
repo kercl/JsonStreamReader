@@ -187,7 +187,6 @@ void json::RawParser::parse_object(char c) {
         if(c == '}') {
             if(m_stack_top == 0) {
                 FLAG_SET(DOCUMENT_ENDED);
-                ascend();
             }
             else {
                 ascend();
@@ -397,31 +396,27 @@ void json::RawParser::parse_string(char c) {
     } else {
         if(c == '\\') {
             FLAG_SET(CHAR_ESCAPED);
-            return;
-        }
-
-        if(c == '"') {
+        } else if(c == '"') {
             buffer_append_char('\0');
             pop();
-            return;
+        } else {
+            ASSERT(c >= 0x20 && c != 0x7f,
+                ErrorUnescapedControlCharacter);
+
+            buffer_append_char(c);
         }
-
-        ASSERT(c >= 0x20 && c != 0x7f,
-            ErrorUnescapedControlCharacter);
-
-        buffer_append_char(c);
     }
 }
 
 void json::RawParser::parse_number(char c) {
-    if(m_buffer_sizes[m_buffer_level] == 0) {
+    switch(m_buffer_sizes[m_buffer_level]) {
+    case 0:
         FLAG_CLEAR(NUM_HAS_COMMA | NUM_IS_EXP);
 
         EXPECT(IS_DIGIT(c) || c == '-');
         buffer_append_char(c);
         return;
-    }
-    if (m_buffer_sizes[m_buffer_level] == 1) {
+    case 1:
         if(IS_DIGIT(c)) {
             EXPECT(buffer_last() != '0');
             buffer_append_char(c);
@@ -432,22 +427,24 @@ void json::RawParser::parse_number(char c) {
             buffer_append_char(c);
             return;
         }
-    }
-    if (m_buffer_sizes[m_buffer_level] == 2) {
+        break;
+    case 2:
         if(c == '0' && buffer_first() == '-') {
             EXPECT(buffer_last() != '0');
             buffer_append_char(c);
             return;
         }
         if(buffer_first() == '-' && buffer_last() == '0') {
-            EXPECT(c == '.');
-            buffer_append_char(c);
-            return;
+            EXPECT(!IS_DIGIT(c));
+            break;
         }
         if(IS_DIGIT(c)) {
             buffer_append_char(c);
             return;
         }
+        break;
+    default:
+        break;
     }
 
     if(c == '.') {
@@ -466,6 +463,10 @@ void json::RawParser::parse_number(char c) {
         buffer_append_char(c);
         return;
     }
+    if(IS_DIGIT(c)) {
+        buffer_append_char(c);
+        return;
+    }
 
     if(buffer_last() == '.') {
         EXPECT(IS_DIGIT(c));
@@ -479,10 +480,6 @@ void json::RawParser::parse_number(char c) {
     }
     if(buffer_last() == 'e' || buffer_last() == 'E') {
         EXPECT(c == '+' || c == '-' || IS_DIGIT(c));
-        buffer_append_char(c);
-        return;
-    }
-    if(IS_DIGIT(c)) {
         buffer_append_char(c);
         return;
     }
@@ -600,7 +597,9 @@ void json::RawParser::parse(char c) {
             push(ObjectBegin);
             return;
         }
-        ERROR(ErrorUnexpectedCharacter);
+        TRIGGER_DOCUMENT_BEGIN(Value);
+        push(Value);
+        //ERROR(ErrorUnexpectedCharacter);
     }
 
     switch(peek()) {
@@ -609,59 +608,82 @@ void json::RawParser::parse(char c) {
     case ObjectColon:
     case Object:
         parse_object(c);
-        break;
+        return;
     case ArrayBegin:
     case Array:
         parse_array(c);
-        break;
+        return;
     case Value:
         parse_value(c);
-        break;
+        return;
     case StringBegin:
     case String:
         parse_string(c);
         if(peek() == Value) {
             pop();
             on_string(Path(this), m_buffers[m_buffer_level]);
-            ascend();
+            if(m_stack_top > 0) {
+                ascend();
+                return;
+            }
+            break;
         }
-        break;
+        return;
     case Number:
         parse_number(c);
         if(peek() == Value) {
             pop();
             on_number(Path(this), m_buffers[m_buffer_level]);
-            ascend();
-            parse(c);
+            if(m_stack_top > 0) {
+                ascend();
+                parse(c);
+                return;
+            }
+            EXPECT_WHITESPACE(c);
+            break;
         }
-        break;
+        return;
     case ValueTrue:
         parse_true(c);
         if(peek() == Value) {
             pop();
             on_true(Path(this));
-            ascend();
+            if(m_stack_top > 0) {
+                ascend();
+                return;
+            }
+            break;
         }
-        break;
+        return;
     case ValueFalse:
         parse_false(c);
         if(peek() == Value) {
             pop();
             on_false(Path(this));
-            ascend();
+            if(m_stack_top > 0) {
+                ascend();
+                return;
+            }
+            break;
         }
-        break;
+        return;
     case ValueNull:
         parse_null(c);
         if(peek() == Value) {
             pop();
             on_null(Path(this));
-            ascend();
+            if(m_stack_top > 0) {
+                ascend();
+                return;
+            }
+            break;
         }
-        break;
+        return;
     default:
         ERROR(ErrorNotImplemented);
     }
+    FLAG_SET(DOCUMENT_ENDED);
+    TRIGGER_DOCUMENT_END(Value);
 }
 
 void json::RawParser::write(char c) {
