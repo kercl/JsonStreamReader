@@ -8,6 +8,7 @@
         "new": "cpp",
         "ostream": "cpp",
         "streambuf": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "complex": "cpp"
     }
 }

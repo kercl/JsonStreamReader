@@ -3,11 +3,22 @@
 #include <cstdio>
 #include "JSONParser.h"
 
+#if defined __has_cpp_attribute
+    #if __has_cpp_attribute(fallthrough)
+        #define SUPRESS_FALLTHROUGH_WARNING [[fallthrough]];
+    #else
+        #define SUPRESS_FALLTHROUGH_WARNING
+    #endif
+#else
+    #define SUPRESS_FALLTHROUGH_WARNING
+#endif
+
 #define CHAR_ESCAPED     (1 << 0)
 #define CHAR_UNICODE     (1 << 1)
 #define NUM_HAS_COMMA    (1 << 2)
 #define NUM_IS_EXP       (1 << 3)
 #define DOCUMENT_INVALID (1 << 4)
+#define DOCUMENT_ENDED   (1 << 5)
 
 #define FLAG_SET(flags) (m_parse_flags |= flags)
 #define FLAG_CLEAR(flags) (m_parse_flags &= ~(flags))
@@ -34,16 +45,18 @@
 #else
 #   define ERROR2(err_code, ret) \
         FLAG_SET(DOCUMENT_INVALID); \
-        on_error(ErrorUnexpectedCharacter); \
+        on_error(err_code); \
         return ret;
 #endif
 
 #define ERROR(err_code) ERROR2(err_code,)
 
-#define EXPECT(cond)                       \
+#define ASSERT(cond, err_code)             \
     if(!(cond)) {                          \
-        ERROR(ErrorUnexpectedCharacter)      \
+        ERROR(err_code)      \
     }
+
+#define EXPECT(cond) ASSERT(cond, ErrorUnexpectedCharacter)
 
 #define EXPECT_WHITESPACE(c) \
     if(!is_whitespace(c)) { \
@@ -120,6 +133,11 @@ inline void json::RawParser::buffer_assign_int(int i) {
     m_buffer_sizes[m_buffer_level] = sizeof(int);
 }
 
+inline int json::RawParser::buffer_as_int() {
+    int *data = (int*)&m_buffers[m_buffer_level][0];
+    return *data;
+}
+
 inline void json::RawParser::buffer_increment_int() {
     int *data = (int*)&m_buffers[m_buffer_level][0];
     *data = *data + 1;
@@ -166,7 +184,7 @@ void json::RawParser::parse_document(char c) {
     switch(c) {
     case '{':
         push(DocumentObject);
-        push(ObjectKey);
+        push(ObjectBegin);
 #if JSONSTREAM_TRIGGER_DOCUMENT_BEGIN
         on_document_begin(Object);
 #endif
@@ -187,21 +205,24 @@ void json::RawParser::parse_object(char c) {
     SKIP_WHITESPACES(c)
 
     switch(pop()) {
-    case ObjectKey:
+    case ObjectBegin:
         if(c == '}') {
 #if JSONSTREAM_TRIGGER_OBJECT_EMPTY
             on_object_empty(Path(this));
 #endif
             if(peek() != DocumentObject) {
                 ascend();
-            } 
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
-            else {
-                on_document_end(Object);
             }
+            else {
+#if JSONSTREAM_TRIGGER_DOCUMENT_END
+                on_document_end(Object);
+                FLAG_SET(DOCUMENT_ENDED);
 #endif
+            }
             return;
         }
+        SUPRESS_FALLTHROUGH_WARNING
+    case ObjectKey:
         EXPECT(c == '\"');
         push(ObjectColon);
         push(StringBegin);
@@ -221,11 +242,12 @@ void json::RawParser::parse_object(char c) {
             if(peek() != DocumentObject) {
                 ascend();
             }
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
             else {
+#if JSONSTREAM_TRIGGER_DOCUMENT_END
                 on_document_end(Object);
-            }
 #endif
+                FLAG_SET(DOCUMENT_ENDED);
+            }
             return;
         }
         EXPECT(c == ',');
@@ -242,7 +264,7 @@ void json::RawParser::parse_value(char c) {
     switch(c) {
     case '{':
         pop();
-        push(ObjectKey);
+        push(ObjectBegin);
         return;
     case '[':
         pop();
@@ -276,14 +298,22 @@ void json::RawParser::parse_value(char c) {
     case 'n':
         parse_null(c);
         return;
-    case ']':
+    default:
         pop();
-        EXPECT(peek() == Array && m_buffer_sizes[m_buffer_level] > 0);
+        std::cout << "retrying " << c << std::endl;
+        dump_state();
         ascend();
-#if JSONSTREAM_TRIGGER_OBJECT_EMPTY
-        on_array_empty(Path(this));
-#endif
-        pop();
+        parse(c);
+//     case ']':
+//         pop();
+//         ascend();
+//         if(buffer_as_int() > 0) {
+//             EXPECT(peek() == Array && m_buffer_sizes[m_buffer_level + 1] > 0);
+//         }
+// #if JSONSTREAM_TRIGGER_OBJECT_EMPTY
+//         on_array_empty(Path(this));
+// #endif
+//         pop();
         return;
     }
 
@@ -376,6 +406,9 @@ void json::RawParser::parse_string(char c) {
             return;
         }
 
+        ASSERT(c >= 0x20 && c != 0x7f,
+            ErrorUnescapedControlCharacter);
+
         buffer_append_char(c);
     }
 }
@@ -389,12 +422,8 @@ void json::RawParser::parse_number(char c) {
         return;
     }
     if (m_buffer_sizes[m_buffer_level] == 1) {
-        if(c == '0') {
-            EXPECT(buffer_last() != '0');
-            buffer_append_char(c);
-            return;
-        }
         if(IS_DIGIT(c)) {
+            EXPECT(buffer_last() != '0');
             buffer_append_char(c);
             return;
         }
@@ -460,6 +489,15 @@ void json::RawParser::parse_number(char c) {
 
     buffer_append_char('\0');
     pop();
+    
+    if(peek() == Value) {
+        pop();
+        on_number(Path(this), m_buffers[m_buffer_level]);
+        ascend();
+        parse(c);
+    }
+
+    parse(c);
 }
 
 void json::RawParser::parse_true(char c) {
@@ -549,29 +587,44 @@ void json::RawParser::parse_null(char c) {
 void json::RawParser::parse_array(char c) {
     SKIP_WHITESPACES(c)
 
+    std::cout << "parsing array: " << c << std::endl;
+
     if(peek() == ArrayBegin) {
         EXPECT(c == '[');
         pop();
         push(Array);
         push(Value);
+#if JSONSTREAM_TRIGGER_ARRAY_END
+        on_array_begin(Path(this));
+#endif
         buffer_assign_int(0);
         descend();
         return;
     }
 
     if(c == ']') {
-#if JSONSTREAM_TRIGGER_ARRAY_END
-        on_array_end(Path(this));
-#endif
         pop();
+        if(buffer_as_int() == 0) {
+#if JSONSTREAM_TRIGGER_OBJECT_EMPTY
+            on_array_empty(Path(this));
+#endif
+        }
         if(peek() != DocumentArray) {
+#if JSONSTREAM_TRIGGER_ARRAY_END
+            on_array_end(Path(this));
+#endif
             ascend();
         }
-#if JSONSTREAM_TRIGGER_DOCUMENT_END
         else {
-            on_document_end(Array);
-        }
+#if JSONSTREAM_TRIGGER_ARRAY_END
+            on_array_end(Path(this));
 #endif
+#if JSONSTREAM_TRIGGER_DOCUMENT_END
+            on_document_end(Array);
+#endif
+            std::cout << "array ended" << std::endl;
+            FLAG_SET(DOCUMENT_ENDED);
+        }
         return;
     }
 
@@ -586,6 +639,12 @@ void json::RawParser::parse(char c) {
         return;
     }
 
+    std::cout << "flag doc ended: " << FLAG_IS_SET(DOCUMENT_ENDED) << " < " << c << std::endl;
+    if(FLAG_IS_SET(DOCUMENT_ENDED)) {
+        EXPECT_WHITESPACE(c);
+        return;
+    }
+
     if(m_stack_top == 0) {
         parse_document(c);
         return;
@@ -594,8 +653,9 @@ void json::RawParser::parse(char c) {
     switch(peek()) {
     case DocumentObject:
     case DocumentArray:
-        EXPECT_WHITESPACE(c);
+        //EXPECT_WHITESPACE(c);
         break;
+    case ObjectBegin:
     case ObjectKey:
     case ObjectColon:
     case Object:
@@ -615,12 +675,12 @@ void json::RawParser::parse(char c) {
         break;
     case Number:
         parse_number(c);
-        if(peek() == Value) {
-            pop();
-            on_number(Path(this), m_buffers[m_buffer_level]);
-            ascend();
-            parse(c);
-        }
+        // if(peek() == Value) {
+        //     pop();
+        //     on_number(Path(this), m_buffers[m_buffer_level]);
+        //     ascend();
+        //     parse(c);
+        // }
         break;
     case ArrayBegin:
     case Array:
@@ -657,6 +717,17 @@ void json::RawParser::parse(char c) {
 
 void json::RawParser::write(char c) {
     parse(c);
+}
+
+void json::RawParser::end_of_transmission() {
+    if(FLAG_IS_SET(DOCUMENT_INVALID)) {
+        return;
+    }
+
+    ASSERT(peek() == DocumentArray || peek() == DocumentObject,
+        ErrorDocumentNotClosed);
+
+    reset();
 }
 
 json::Path::Path(const json::RawParser *parser) : m_parser(parser) {}
@@ -709,4 +780,77 @@ unsigned int json::Path::key_length(unsigned int i) const {
 
 unsigned int json::Path::size() const {
     return m_parser->m_buffer_level;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+const char _dbg_struct_names[json::Undefined][40] = {
+"DocumentObject",
+"DocumentArray",
+"ObjectBegin",
+"Object",
+"ObjectKey",
+"ObjectColon",
+"Value",
+"ArrayBegin",
+"Array",
+"Number",
+"StringBegin",
+"String",
+"ValueTrue",
+"ValueFalse",
+"ValueNull"
+};
+
+void json::RawParser::dump_state() {
+    unsigned int struct_name_max_len = 0;
+    for(unsigned int i = 0; i < Undefined; i++) {
+        if(strlen(_dbg_struct_names[i]) > struct_name_max_len) {
+            struct_name_max_len = strlen(_dbg_struct_names[i]);
+        }
+    }
+
+    printf("Stack: %4d", m_stack_top);
+    for(unsigned int i = 0; i < struct_name_max_len - 11; i++)
+        printf(" ");
+    printf(" | Data: %3d\n", m_buffer_level);
+    printf("================================\n");
+
+    for(unsigned int i = 0; i < std::max(m_buffer_level, m_stack_top); ++i) {
+        if(i < m_stack_top) {
+            printf("%*s",
+                struct_name_max_len,
+                _dbg_struct_names[m_stack[i]]);
+        } else {
+            for(unsigned int j = 0; j < struct_name_max_len; j++)
+                printf(" ");
+        }
+
+        if(i <= m_buffer_level) {
+            if(m_buffer_sizes[i] == sizeof(int) &&
+               m_buffers[i][sizeof(int) - 1] == '\0')
+            {
+                int *data = (int*)&m_buffers[i][0];
+                printf(" | (int): %d\n",
+                    *data);
+            } else {
+                printf(" | %4d: %.*s\n", 
+                    m_buffer_sizes[i],
+                    m_buffer_sizes[i],
+                    m_buffers[i]);
+            }
+        } else {
+            printf("\n");
+        }
+    }
 }

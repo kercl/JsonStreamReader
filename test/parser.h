@@ -5,15 +5,70 @@
 
 #define SUPPRESS_UNUSED(x) ((void)x)
 
-#define TEST_CASE(name, json_doc) \
+#define JSON_PARSER_EXPECT_FAILURE(name, json_doc) \
     BOOST_AUTO_TEST_CASE(name) { \
-        std::string test_case(#json_doc); \
-        BOOST_CHECK(TestParser::parse_string(test_case) != json::NoError);}
+        std::string test_case(json_doc); \
+        BOOST_TEST(TestParser::parse_string(test_case) != json::NoError, \
+                   "Parsing of the document " << json_doc << " is expected fail.");}
+
+#define JSON_PARSER_EXPECT_SUCCESS(name, json_doc) \
+    BOOST_AUTO_TEST_CASE(name) { \
+        std::string test_case(json_doc); \
+        BOOST_TEST(TestParser::parse_string(test_case) == json::NoError, \
+                   "Parsing of the document " << json_doc << " is expected succeed.");}
 
 class TestParser : public json::RawParser {
     json::ErrorCode m_last_error;
 public:
     TestParser() : m_last_error(json::NoError) {}
+
+#if JSONSTREAM_TRIGGER_DOCUMENT_BEGIN
+    void on_document_begin(json::Type type) override {
+        SUPPRESS_UNUSED(type);
+    }
+#endif
+
+#if JSONSTREAM_TRIGGER_DOCUMENT_END
+    void on_document_end(json::Type type) override {
+        SUPPRESS_UNUSED(type);
+    }
+#endif
+
+#if JSONSTREAM_TRIGGER_ARRAY_BEGIN
+    void on_array_begin(const json::Path& path) override {
+        SUPPRESS_UNUSED(path);
+    }
+#endif
+
+#if JSONSTREAM_TRIGGER_ARRAY_EMPTY
+    void on_array_empty(const json::Path& path) override {
+        SUPPRESS_UNUSED(path);
+    }
+#endif
+
+#if JSONSTREAM_TRIGGER_ARRAY_END
+    void on_array_end(const json::Path& path) override {
+        SUPPRESS_UNUSED(path);
+    }
+#endif
+
+#if JSONSTREAM_TRIGGER_OBJECT_BEGIN
+    void on_object_begin(const json::Path& path) override {
+        SUPPRESS_UNUSED(path);
+    }
+#endif
+
+#if JSONSTREAM_TRIGGER_OBJECT_EMPTY
+    void on_object_empty(const json::Path& path) override {
+        SUPPRESS_UNUSED(path);
+    }
+#endif
+
+#if JSONSTREAM_TRIGGER_OBJECT_END
+    void on_object_end(const json::Path& path) override {
+        SUPPRESS_UNUSED(path);
+    }
+#endif
 
     void on_string(const json::Path& path, const char *value) override {
         SUPPRESS_UNUSED(path);
@@ -59,6 +114,9 @@ public:
         case json::ErrorUnknownEscapeCharacter:
             BOOST_TEST_MESSAGE(" - Error: Unknown escape character.");
             break;
+        case json::ErrorDocumentNotClosed:
+            BOOST_TEST_MESSAGE(" - Error: Document not closed.");
+            break;
         default:
             break;
         }
@@ -72,6 +130,7 @@ public:
                 break;
             parser.parse(c);
         }
+        parser.end_of_transmission();
 
         return parser.m_last_error;
     }

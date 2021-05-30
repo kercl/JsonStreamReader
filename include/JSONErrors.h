@@ -9,7 +9,9 @@ enum ErrorCode {
     ErrorStackEmpty,
     ErrorBufferEmpty,
     ErrorNotImplemented,
-    ErrorUnknownEscapeCharacter
+    ErrorUnknownEscapeCharacter,
+    ErrorDocumentNotClosed,
+    ErrorUnescapedControlCharacter
 };
 
 }

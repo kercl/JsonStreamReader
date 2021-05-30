@@ -36,8 +36,8 @@ typedef uint64_t stack_int_t;
 enum Type: uint8_t {
     DocumentObject,
     DocumentArray,
-    ObjectBegin,
     Object,
+    ObjectBegin,
     ObjectKey,
     ObjectColon,
     Value,
@@ -77,6 +77,7 @@ private:
 
     inline void buffer_append_char(char c);
     inline void buffer_assign_int(int i);
+    inline int buffer_as_int();
     inline void buffer_increment_int();
     inline char buffer_last();
     inline char buffer_first();
@@ -98,6 +99,7 @@ public:
 
     void reset();
     void parse(char c);
+    void end_of_transmission();
 
     virtual void write(char c);
     void dump_state();
