@@ -97,3 +97,13 @@ json_test_suite_object_successes = executable(
     ],
     include_directories: inc_directory)
 test('json_test_suite_object_successes', json_test_suite_object_successes, env : [ 'BOOST_TEST_LOG_LEVEL=message'])
+
+
+json_test_suite_structure_successes = executable(
+    'json_test_suite_structure_successes',
+    src_files + [files('json_test_suite_structure_successes.cpp')],
+    dependencies: [
+        meson.get_compiler('cpp').find_library('boost_unit_test_framework')
+    ],
+    include_directories: inc_directory)
+test('json_test_suite_structure_successes', json_test_suite_structure_successes, env : [ 'BOOST_TEST_LOG_LEVEL=message'])

@@ -5,62 +5,63 @@
 
 #if defined __has_cpp_attribute
     #if __has_cpp_attribute(fallthrough)
-        #define SUPPRESS_FALLTHROUGH_WARNING [[fallthrough]];
+        #define __SUPPRESS_FALLTHROUGH_WARNING [[fallthrough]];
     #else
-        #define SUPPRESS_FALLTHROUGH_WARNING
+        #define __SUPPRESS_FALLTHROUGH_WARNING
     #endif
 #else
-    #define SUPPRESS_FALLTHROUGH_WARNING
+    #define __SUPPRESS_FALLTHROUGH_WARNING
 #endif
 
-#define CHAR_ESCAPED     (1 << 0)
-#define CHAR_UNICODE     (1 << 1)
-#define NUM_HAS_COMMA    (1 << 2)
-#define NUM_IS_EXP       (1 << 3)
-#define DOCUMENT_INVALID (1 << 4)
-#define DOCUMENT_ENDED   (1 << 5)
+#define JSONSTREAM_CHAR_ESCAPED     (1 << 0)
+#define JSONSTREAM_CHAR_UNICODE     (1 << 1)
+#define JSONSTREAM_NUM_HAS_COMMA    (1 << 2)
+#define JSONSTREAM_NUM_IS_EXP       (1 << 3)
+#define JSONSTREAM_DOCUMENT_INVALID (1 << 4)
+#define JSONSTREAM_DOCUMENT_ENDED   (1 << 5)
 
-#define FLAG_SET(flags) (m_parse_flags |= flags)
-#define FLAG_CLEAR(flags) (m_parse_flags &= ~(flags))
-#define FLAG_IS_SET(flags) (m_parse_flags & (flags))
-#define FLAG_IS_CLEARED(flags) (!FLAG_IS_SET(flags))
+#define JSONSTREAM_FLAG_CLEAR(flags) (m_parse_flags &= ~(flags))
+#define JSONSTREAM_FLAG_SET(flags) (m_parse_flags |= flags)
+#define JSONSTREAM_FLAG_IS_CLEARED(flags) (!JSONSTREAM_FLAG_IS_SET(flags))
+#define JSONSTREAM_FLAG_IS_SET(flags) (m_parse_flags & (flags))
 
-#define IS_DIGIT(c) (c >= '0' && c <= '9')
-#define IS_HEX(c) (IS_DIGIT(c) \
-                    || (c >= 'a' && c <= 'f') \
-                    || (c >= 'A' && c <= 'F'))
+#define JSONSTREAM_IS_DIGIT(c) (c >= '0' && c <= '9')
+#define JSONSTREAM_IS_HEX(c) (JSONSTREAM_IS_DIGIT(c)     \
+                              || (c >= 'a' && c <= 'f')  \
+                              || (c >= 'A' && c <= 'F'))
 
-#define SKIP_WHITESPACES(c) \
-    if(is_whitespace(c)) { \
-        return;            \
-    }                      \
+#define JSONSTREAM_SKIP_WHITESPACES(c) \
+    if(is_whitespace(c)) {             \
+        return;                        \
+    }
 
 
 #ifdef JSONSTREAM_CERR_ERROR_MSG
-#   define ERROR2(err_code, ret) \
-        FLAG_SET(DOCUMENT_INVALID); \
-        std::cerr << __FILE__ << ":" << __LINE__ << ": error: " << err_code << std::endl; \
-        on_error(ErrorUnexpectedCharacter); \
+#   define JSONSTREAM_ERROR2(err_code, ret)                \
+        JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_INVALID);  \
+        std::cerr << __FILE__ << ":" << __LINE__ <<        \
+                     ": error: " << err_code << std::endl; \
+        on_error(ErrorUnexpectedCharacter);                \
         return ret;
 #else
-#   define ERROR2(err_code, ret) \
-        FLAG_SET(DOCUMENT_INVALID); \
-        on_error(err_code); \
+#   define JSONSTREAM_ERROR2(err_code, ret)                \
+        JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_INVALID);  \
+        on_error(err_code);                                \
         return ret;
 #endif
 
-#define ERROR(err_code) ERROR2(err_code,)
+#define JSONSTREAM_ERROR(err_code) JSONSTREAM_ERROR2(err_code,)
 
-#define ASSERT(cond, err_code)             \
-    if(!(cond)) {                          \
-        ERROR(err_code)      \
+#define JSONSTREAM_ASSERT(cond, err_code) \
+    if(!(cond)) {                         \
+        JSONSTREAM_ERROR(err_code)        \
     }
 
-#define EXPECT(cond) ASSERT(cond, ErrorUnexpectedCharacter)
+#define JSONSTREAM_EXPECT(cond) JSONSTREAM_ASSERT(cond, ErrorUnexpectedCharacter)
 
-#define EXPECT_WHITESPACE(c) \
-    if(!is_whitespace(c)) { \
-        ERROR(ErrorUnexpectedCharacter) \
+#define JSONSTREAM_EXPECT_WHITESPACE(c)            \
+    if(!is_whitespace(c)) {                        \
+        JSONSTREAM_ERROR(ErrorUnexpectedCharacter) \
     }
 
 json::RawParser::RawParser()
@@ -94,7 +95,7 @@ bool json::RawParser::is_whitespace(char c) {
 
 inline void json::RawParser::push(Type structure) {
     if(m_stack_top == JSONSTREAM_STACK_LIMIT - 1) {
-        ERROR(ErrorOutOfMemory)
+        JSONSTREAM_ERROR(ErrorOutOfMemory)
     }
 
     m_stack[m_stack_top++] = structure;
@@ -102,7 +103,7 @@ inline void json::RawParser::push(Type structure) {
 
 inline json::Type json::RawParser::pop() {
     if(m_stack_top == 0) {
-        ERROR2(ErrorStackEmpty, Undefined);
+        JSONSTREAM_ERROR2(ErrorStackEmpty, Undefined);
     }
 
     return m_stack[--m_stack_top];
@@ -110,7 +111,7 @@ inline json::Type json::RawParser::pop() {
 
 inline json::Type json::RawParser::peek() {
     if(m_stack_top == 0) {
-        ERROR2(ErrorStackEmpty, Undefined);
+        JSONSTREAM_ERROR2(ErrorStackEmpty, Undefined);
     }
 
     return m_stack[m_stack_top - 1];
@@ -120,7 +121,7 @@ inline void json::RawParser::buffer_append_char(char c) {
     if(m_buffer_level == JSONSTREAM_MAX_DEPTH || 
        m_buffer_sizes[m_buffer_level] == JSONSTREAM_BUFFER_LIMIT)
     {
-        ERROR(ErrorOutOfMemory);
+        JSONSTREAM_ERROR(ErrorOutOfMemory);
     }
 
     m_buffers[m_buffer_level][m_buffer_sizes[m_buffer_level]] = c;
@@ -160,7 +161,7 @@ inline char json::RawParser::buffer_first() {
 
 inline void json::RawParser::descend() {
     if(m_buffer_level == JSONSTREAM_MAX_DEPTH - 1) {
-        ERROR(ErrorOutOfMemory);
+        JSONSTREAM_ERROR(ErrorOutOfMemory);
     }
 
     m_buffer_sizes[++m_buffer_level] = 0;
@@ -168,7 +169,7 @@ inline void json::RawParser::descend() {
 
 inline void json::RawParser::ascend() {
     if(m_buffer_level == 0) {
-        ERROR(ErrorBufferEmpty);
+        JSONSTREAM_ERROR(ErrorBufferEmpty);
     }
 
     m_buffer_sizes[--m_buffer_level] = 0;
@@ -180,13 +181,13 @@ inline void json::RawParser::clear_data() {
 
 
 void json::RawParser::parse_object(char c) {
-    SKIP_WHITESPACES(c)
+    JSONSTREAM_SKIP_WHITESPACES(c)
 
     switch(pop()) {
     case ObjectBegin:
         if(c == '}') {
             if(m_stack_top == 0) {
-                FLAG_SET(DOCUMENT_ENDED);
+                JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
             }
             else {
                 ascend();
@@ -195,15 +196,15 @@ void json::RawParser::parse_object(char c) {
             TRIGGER_OBJECT_END(Path(this));
             return;
         }
-        SUPPRESS_FALLTHROUGH_WARNING
+        __SUPPRESS_FALLTHROUGH_WARNING
     case ObjectKey:
-        EXPECT(c == '\"');
+        JSONSTREAM_EXPECT(c == '\"');
         push(ObjectColon);
         push(StringBegin);
         parse_string(c);
         return;
     case ObjectColon:
-        EXPECT(c == ':');
+        JSONSTREAM_EXPECT(c == ':');
         push(Object);
         push(Value);
         descend();
@@ -211,7 +212,7 @@ void json::RawParser::parse_object(char c) {
     case Object:
         if(c == '}') {
             if(m_stack_top == 0) {
-                FLAG_SET(DOCUMENT_ENDED);
+                JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
                 TRIGGER_OBJECT_END(Path(this));
             } else {
                 ascend();
@@ -219,16 +220,16 @@ void json::RawParser::parse_object(char c) {
             }
             return;
         }
-        EXPECT(c == ',');
+        JSONSTREAM_EXPECT(c == ',');
         push(ObjectKey);
         return;
     default:
-        ERROR(ErrorNotImplemented);
+        JSONSTREAM_ERROR(ErrorNotImplemented);
     }
 }
 
 void json::RawParser::parse_array(char c) {
-    SKIP_WHITESPACES(c)
+    JSONSTREAM_SKIP_WHITESPACES(c)
 
     if(peek() == ArrayBegin) {
         pop();
@@ -237,13 +238,13 @@ void json::RawParser::parse_array(char c) {
             TRIGGER_ARRAY_END(Path(this));
 
             if(m_stack_top == 0) {
-                FLAG_SET(DOCUMENT_ENDED);
+                JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
             } else {
                 ascend();
             }
             return;
         }
-        EXPECT(c != ',');
+        JSONSTREAM_EXPECT(c != ',');
         push(Array);
         push(Value);
         buffer_assign_int(0);
@@ -255,7 +256,7 @@ void json::RawParser::parse_array(char c) {
     if(c == ']') {
         pop();
         if(m_stack_top == 0) {
-            FLAG_SET(DOCUMENT_ENDED);
+            JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
             TRIGGER_ARRAY_END(Path(this));
             TRIGGER_DOCUMENT_END(Array);
         } else {
@@ -265,14 +266,20 @@ void json::RawParser::parse_array(char c) {
         return;
     }
 
-    EXPECT(c == ',');
+    JSONSTREAM_EXPECT(c == ',');
     push(Value);
     buffer_increment_int();
     descend();
 }
 
 void json::RawParser::parse_value(char c) {
-    SKIP_WHITESPACES(c)
+    JSONSTREAM_SKIP_WHITESPACES(c)
+
+    if(JSONSTREAM_IS_DIGIT(c) || c == '-') {
+        push(Number);
+        parse_number(c);
+        return;
+    }
 
     switch(c) {
     case '{':
@@ -284,20 +291,6 @@ void json::RawParser::parse_value(char c) {
         pop();
         push(ArrayBegin);
         TRIGGER_ARRAY_BEGIN(Path(this));
-        return;
-    case '-':
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
-        push(Number);
-        parse_number(c);
         return;
     case '\"':
         push(StringBegin);
@@ -316,19 +309,19 @@ void json::RawParser::parse_value(char c) {
         break;
     }
 
-    ERROR(ErrorUnexpectedCharacter)
+    JSONSTREAM_ERROR(ErrorUnexpectedCharacter)
 }
 
 void json::RawParser::parse_string(char c) {
     if(peek() == StringBegin) {
-        EXPECT(c == '\"');
+        JSONSTREAM_EXPECT(c == '\"');
         pop();
         push(String);
-        FLAG_CLEAR(CHAR_ESCAPED);
+        JSONSTREAM_FLAG_CLEAR(JSONSTREAM_CHAR_ESCAPED);
         return;
     }
 
-    if(FLAG_IS_SET(CHAR_ESCAPED)) {
+    if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_CHAR_ESCAPED)) {
         switch(c) {
         case '\\':
         case '"':
@@ -353,14 +346,14 @@ void json::RawParser::parse_string(char c) {
         case 'u':
             unicode_idx = 0;
             unicode_codepoint = 0;
-            FLAG_SET(CHAR_UNICODE);
+            JSONSTREAM_FLAG_SET(JSONSTREAM_CHAR_UNICODE);
             break;
         default:
-            ERROR(ErrorUnknownEscapeCharacter);
+            JSONSTREAM_ERROR(ErrorUnknownEscapeCharacter);
         }
-        FLAG_CLEAR(CHAR_ESCAPED);
-    } else if(FLAG_IS_SET(CHAR_UNICODE)) {
-        EXPECT(IS_HEX(c));
+        JSONSTREAM_FLAG_CLEAR(JSONSTREAM_CHAR_ESCAPED);
+    } else if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_CHAR_UNICODE)) {
+        JSONSTREAM_EXPECT(JSONSTREAM_IS_HEX(c));
 
         if(c >= 'a') {
             unicode_codepoint = (unicode_codepoint << 4) + c - 'a' + 0xa;
@@ -390,17 +383,17 @@ void json::RawParser::parse_string(char c) {
                 buffer_append_char(x);
             }
 
-            FLAG_CLEAR(CHAR_UNICODE);
+            JSONSTREAM_FLAG_CLEAR(JSONSTREAM_CHAR_UNICODE);
             return;
         }
     } else {
         if(c == '\\') {
-            FLAG_SET(CHAR_ESCAPED);
+            JSONSTREAM_FLAG_SET(JSONSTREAM_CHAR_ESCAPED);
         } else if(c == '"') {
             buffer_append_char('\0');
             pop();
         } else {
-            ASSERT(c >= 0x20 && c != 0x7f,
+            JSONSTREAM_ASSERT(c >= 0x20 && c != 0x7f,
                 ErrorUnescapedControlCharacter);
 
             buffer_append_char(c);
@@ -411,34 +404,34 @@ void json::RawParser::parse_string(char c) {
 void json::RawParser::parse_number(char c) {
     switch(m_buffer_sizes[m_buffer_level]) {
     case 0:
-        FLAG_CLEAR(NUM_HAS_COMMA | NUM_IS_EXP);
+        JSONSTREAM_FLAG_CLEAR(JSONSTREAM_NUM_HAS_COMMA | JSONSTREAM_NUM_IS_EXP);
 
-        EXPECT(IS_DIGIT(c) || c == '-');
+        JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(c) || c == '-');
         buffer_append_char(c);
         return;
     case 1:
-        if(IS_DIGIT(c)) {
-            EXPECT(buffer_last() != '0');
+        if(JSONSTREAM_IS_DIGIT(c)) {
+            JSONSTREAM_EXPECT(buffer_last() != '0');
             buffer_append_char(c);
             return;
         }
         if(buffer_last() == '-') {
-            EXPECT(IS_DIGIT(c));
+            JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(c));
             buffer_append_char(c);
             return;
         }
         break;
     case 2:
         if(c == '0' && buffer_first() == '-') {
-            EXPECT(buffer_last() != '0');
+            JSONSTREAM_EXPECT(buffer_last() != '0');
             buffer_append_char(c);
             return;
         }
         if(buffer_first() == '-' && buffer_last() == '0') {
-            EXPECT(!IS_DIGIT(c));
+            JSONSTREAM_EXPECT(!JSONSTREAM_IS_DIGIT(c));
             break;
         }
-        if(IS_DIGIT(c)) {
+        if(JSONSTREAM_IS_DIGIT(c)) {
             buffer_append_char(c);
             return;
         }
@@ -448,38 +441,40 @@ void json::RawParser::parse_number(char c) {
     }
 
     if(c == '.') {
-        EXPECT(FLAG_IS_CLEARED(NUM_HAS_COMMA | NUM_IS_EXP));
-        EXPECT(IS_DIGIT(buffer_last()));
+        JSONSTREAM_EXPECT(JSONSTREAM_FLAG_IS_CLEARED(
+            JSONSTREAM_NUM_HAS_COMMA |
+            JSONSTREAM_NUM_IS_EXP));
+        JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(buffer_last()));
 
-        FLAG_SET(NUM_HAS_COMMA);
+        JSONSTREAM_FLAG_SET(JSONSTREAM_NUM_HAS_COMMA);
         buffer_append_char(c);
         return;
     }
     if(c == 'e' || c == 'E') {
-        EXPECT(FLAG_IS_CLEARED(NUM_IS_EXP));
-        EXPECT(IS_DIGIT(buffer_last()));
+        JSONSTREAM_EXPECT(JSONSTREAM_FLAG_IS_CLEARED(JSONSTREAM_NUM_IS_EXP));
+        JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(buffer_last()));
 
-        FLAG_SET(NUM_IS_EXP);
+        JSONSTREAM_FLAG_SET(JSONSTREAM_NUM_IS_EXP);
         buffer_append_char(c);
         return;
     }
-    if(IS_DIGIT(c)) {
+    if(JSONSTREAM_IS_DIGIT(c)) {
         buffer_append_char(c);
         return;
     }
 
     if(buffer_last() == '.') {
-        EXPECT(IS_DIGIT(c));
+        JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(c));
         buffer_append_char(c);
         return;
     }
     if(buffer_last() == '+' || buffer_last() == '-') {
-        EXPECT(IS_DIGIT(c));
+        JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(c));
         buffer_append_char(c);
         return;
     }
     if(buffer_last() == 'e' || buffer_last() == 'E') {
-        EXPECT(c == '+' || c == '-' || IS_DIGIT(c));
+        JSONSTREAM_EXPECT(c == '+' || c == '-' || JSONSTREAM_IS_DIGIT(c));
         buffer_append_char(c);
         return;
     }
@@ -490,7 +485,7 @@ void json::RawParser::parse_number(char c) {
 
 void json::RawParser::parse_true(char c) {
     if(m_buffer_sizes[m_buffer_level] == 0) {
-        EXPECT(c == 't');
+        JSONSTREAM_EXPECT(c == 't');
         buffer_append_char('t');
         push(ValueTrue);
         return;
@@ -498,26 +493,26 @@ void json::RawParser::parse_true(char c) {
 
     switch(buffer_last()) {
     case 't':
-        EXPECT(c == 'r');
+        JSONSTREAM_EXPECT(c == 'r');
         break;
     case 'r':
-        EXPECT(c == 'u');
+        JSONSTREAM_EXPECT(c == 'u');
         break;
     case 'u':
-        EXPECT(c == 'e');
+        JSONSTREAM_EXPECT(c == 'e');
         buffer_append_char('e');
         buffer_append_char('\0');
         pop();
         return;
     default:
-        ERROR(ErrorUnexpectedCharacter);
+        JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
     buffer_append_char(c);
 }
 
 void json::RawParser::parse_false(char c) {
     if(m_buffer_sizes[m_buffer_level] == 0) {
-        EXPECT(c == 'f');
+        JSONSTREAM_EXPECT(c == 'f');
         buffer_append_char('f');
         push(ValueFalse);
         return;
@@ -525,29 +520,29 @@ void json::RawParser::parse_false(char c) {
 
     switch(buffer_last()) {
     case 'f':
-        EXPECT(c == 'a');
+        JSONSTREAM_EXPECT(c == 'a');
         break;
     case 'a':
-        EXPECT(c == 'l');
+        JSONSTREAM_EXPECT(c == 'l');
         break;
     case 'l':
-        EXPECT(c == 's');
+        JSONSTREAM_EXPECT(c == 's');
         break;
     case 's':
-        EXPECT(c == 'e');
+        JSONSTREAM_EXPECT(c == 'e');
         buffer_append_char('e');
         buffer_append_char('\0');
         pop();
         return;
     default:
-        ERROR(ErrorUnexpectedCharacter);
+        JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
     buffer_append_char(c);
 }
 
 void json::RawParser::parse_null(char c) {
     if(m_buffer_sizes[m_buffer_level] == 0) {
-        EXPECT(c == 'n');
+        JSONSTREAM_EXPECT(c == 'n');
         buffer_append_char('n');
         push(ValueNull);
         return;
@@ -555,35 +550,35 @@ void json::RawParser::parse_null(char c) {
 
     switch(buffer_last()) {
     case 'n':
-        EXPECT(c == 'u');
+        JSONSTREAM_EXPECT(c == 'u');
         break;
     case 'u':
-        EXPECT(c == 'l');
+        JSONSTREAM_EXPECT(c == 'l');
         break;
     case 'l':
-        EXPECT(c == 'l');
+        JSONSTREAM_EXPECT(c == 'l');
         buffer_append_char('l');
         buffer_append_char('\0');
         pop();
         return;
     default:
-        ERROR(ErrorUnexpectedCharacter);
+        JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
     buffer_append_char(c);
 }
 
 void json::RawParser::parse(char c) {
-    if(FLAG_IS_SET(DOCUMENT_INVALID)) {
+    if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_INVALID)) {
         return;
     }
 
-    if(FLAG_IS_SET(DOCUMENT_ENDED)) {
-        EXPECT_WHITESPACE(c);
+    if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_ENDED)) {
+        JSONSTREAM_EXPECT_WHITESPACE(c);
         return;
     }
 
     if(m_stack_top == 0) {
-        SKIP_WHITESPACES(c);
+        JSONSTREAM_SKIP_WHITESPACES(c);
 
         if(c == '[') {
             TRIGGER_DOCUMENT_BEGIN(Array);
@@ -599,7 +594,7 @@ void json::RawParser::parse(char c) {
         }
         TRIGGER_DOCUMENT_BEGIN(Value);
         push(Value);
-        //ERROR(ErrorUnexpectedCharacter);
+        //JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
 
     switch(peek()) {
@@ -639,7 +634,7 @@ void json::RawParser::parse(char c) {
                 parse(c);
                 return;
             }
-            EXPECT_WHITESPACE(c);
+            JSONSTREAM_EXPECT_WHITESPACE(c);
             break;
         }
         return;
@@ -680,9 +675,9 @@ void json::RawParser::parse(char c) {
         }
         return;
     default:
-        ERROR(ErrorNotImplemented);
+        JSONSTREAM_ERROR(ErrorNotImplemented);
     }
-    FLAG_SET(DOCUMENT_ENDED);
+    JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
     TRIGGER_DOCUMENT_END(Value);
 }
 
@@ -691,11 +686,12 @@ void json::RawParser::write(char c) {
 }
 
 void json::RawParser::end_of_transmission() {
-    if(FLAG_IS_SET(DOCUMENT_INVALID)) {
+    if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_INVALID)) {
         return;
     }
 
-    ASSERT(FLAG_IS_SET(DOCUMENT_ENDED), ErrorDocumentNotClosed);
+    JSONSTREAM_ASSERT(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_ENDED),
+                      ErrorDocumentNotClosed);
 
     reset();
 }
@@ -741,7 +737,9 @@ const char* json::Path::as_name(unsigned int i) const {
 }
 
 unsigned int json::Path::key_length(unsigned int i) const {
-    if(i > m_parser->m_buffer_level || (m_parser->m_parse_flags & DOCUMENT_ENDED)) {
+    if(i > m_parser->m_buffer_level
+       || (m_parser->m_parse_flags & JSONSTREAM_DOCUMENT_ENDED))
+    {
         return 0;
     }
 
@@ -749,7 +747,7 @@ unsigned int json::Path::key_length(unsigned int i) const {
 }
 
 unsigned int json::Path::size() const {
-    if(m_parser->m_parse_flags & DOCUMENT_ENDED) {
+    if(m_parser->m_parse_flags & JSONSTREAM_DOCUMENT_ENDED) {
         return 0;
     }
     return m_parser->m_buffer_level + 1;
