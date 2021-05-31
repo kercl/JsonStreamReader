@@ -186,14 +186,15 @@ void json::RawParser::parse_object(char c) {
     switch(pop()) {
     case ObjectBegin:
         if(c == '}') {
+            TRIGGER_OBJECT_EMPTY(Path(this));
+            TRIGGER_OBJECT_END(Path(this));
             if(m_stack_top == 0) {
                 JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
+                TRIGGER_DOCUMENT_END(Object);
             }
             else {
                 ascend();
             }
-            TRIGGER_OBJECT_EMPTY(Path(this));
-            TRIGGER_OBJECT_END(Path(this));
             return;
         }
         __SUPPRESS_FALLTHROUGH_WARNING
@@ -214,6 +215,7 @@ void json::RawParser::parse_object(char c) {
             if(m_stack_top == 0) {
                 JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
                 TRIGGER_OBJECT_END(Path(this));
+                TRIGGER_DOCUMENT_END(Object);
             } else {
                 ascend();
                 TRIGGER_OBJECT_END(Path(this));
@@ -239,6 +241,7 @@ void json::RawParser::parse_array(char c) {
 
             if(m_stack_top == 0) {
                 JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
+                TRIGGER_DOCUMENT_END(Array);
             } else {
                 ascend();
             }
