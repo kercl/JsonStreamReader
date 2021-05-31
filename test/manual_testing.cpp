@@ -41,8 +41,5 @@ int main(int argc, char **argv) {
     test.end_of_transmission();
     test.reset();
 
-    cout << json::Path((json::RawParser*)&test).size() << endl;
-    cout << json::Path((json::RawParser*)&test).as_name(0) << endl;
-
     return 0;
 }

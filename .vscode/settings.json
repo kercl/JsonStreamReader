@@ -15,5 +15,7 @@
     },
     "editor.tabSize": 4,
     "editor.insertSpaces": false,
-    "editor.rulers": [80,120]
+    "editor.rulers": [80,120],
+    "plantuml.exportSubFolder": false,
+    "plantuml.exportOutDir": "."
 }
