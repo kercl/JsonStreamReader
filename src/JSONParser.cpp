@@ -61,7 +61,8 @@
         JSONSTREAM_ERROR(err_code)        \
     }
 
-#define JSONSTREAM_EXPECT(cond) JSONSTREAM_ASSERT(cond, ErrorUnexpectedCharacter)
+#define JSONSTREAM_EXPECT(cond) \
+    JSONSTREAM_ASSERT(cond, ErrorUnexpectedCharacter)
 
 #define JSONSTREAM_EXPECT_WHITESPACE(c)            \
     if(!is_whitespace(c)) {                        \
@@ -741,7 +742,8 @@ void json::Parser::on_number(const Path& path, const char *str) {
         for(int8_t i = is_signed; i < m_buffer_sizes[m_buffer_level] - 1; ++i) {
             bool success = add_digit(&parsed_num, str[i] - '0');
 #ifdef JSONSTREAM_CHECK_OVERFLOWS
-            JSONSTREAM_ASSERT(success, is_signed ? ErrorUnderflow : ErrorOverflow);
+            JSONSTREAM_ASSERT(success, is_signed ?
+                ErrorUnderflow : ErrorOverflow);
 #endif
         }
 
@@ -774,7 +776,8 @@ void json::Parser::on_number(const Path& path, const char *str) {
 
             if(part_idx == 0) {
 #ifdef JSONSTREAM_CHECK_OVERFLOWS
-                JSONSTREAM_ASSERT(success, is_signed ? ErrorUnderflow : ErrorOverflow);
+                JSONSTREAM_ASSERT(success, is_signed ?
+                    ErrorUnderflow : ErrorOverflow);
 #endif
             } else if(part_idx == 1) {
 #ifdef JSONSTREAM_CHECK_LOSS_OF_SIGNIFICANCE
@@ -835,7 +838,8 @@ void json::Parser::on_number(const Path& path, const char *str) {
     }
 
 #ifdef JSONSTREAM_CHECK_OVERFLOWS
-    JSONSTREAM_ASSERT(!isinf(result), is_signed ? ErrorUnderflow : ErrorOverflow);
+    JSONSTREAM_ASSERT(!isinf(result), is_signed ?
+        ErrorUnderflow : ErrorOverflow);
 #endif
 
     on_float(path, result * (is_signed ? -1.0f : 1.0f));

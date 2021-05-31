@@ -216,9 +216,8 @@ class Path {
     friend class RawParser;
 
     const RawParser *m_parser;
-public:
     Path(const RawParser *parser);
-
+public:
     int as_index(unsigned int i) const;
     const char* as_name(unsigned int i) const;
 
