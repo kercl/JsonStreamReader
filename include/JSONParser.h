@@ -136,6 +136,9 @@ private:
     friend class Path;
     friend class Parser;
 
+#ifdef JSONSTREAM_DEVELOPMENT
+public:
+#endif
     char m_buffers[JSONSTREAM_MAX_DEPTH][JSONSTREAM_BUFFER_LIMIT];
     ParserState m_stack[JSONSTREAM_STACK_LIMIT];
     buffer_int_t m_buffer_sizes[JSONSTREAM_MAX_DEPTH];
@@ -178,9 +181,12 @@ public:
     void parse(char c);
     void end_of_transmission();
 
-    void write(const char *data, size_t len);
+    void write(const char *data);
+    void write(uint8_t *data, size_t len);
     void write(char c);
+#ifdef JSONSTREAM_DEVELOPMENT
     void dump_state();
+#endif
 
     DEF_TRIGGER_DOCUMENT_BEGIN;
     DEF_TRIGGER_DOCUMENT_END;
@@ -192,7 +198,7 @@ public:
     DEF_TRIGGER_ARRAY_EMPTY;
 
     virtual void on_string(const Path& path, const char *value) = 0;
-    virtual void on_number(const Path& path, const char *str) = 0;
+    virtual void on_number(const Path& path, const char *value) = 0;
     virtual void on_true(const Path& path) = 0;
     virtual void on_false(const Path& path) = 0;
     virtual void on_null(const Path& path) = 0;
@@ -213,6 +219,9 @@ public:
 };
 
 class Path {
+#ifdef JSONSTREAM_DEVELOPMENT
+    public:
+#endif
     friend class RawParser;
 
     const RawParser *m_parser;

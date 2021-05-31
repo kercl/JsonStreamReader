@@ -75,6 +75,8 @@ json::RawParser::RawParser()
     , m_parse_flags(0)
 {
     m_buffer_sizes[0] = 0;
+    m_buffers[0][0] = 0;
+    m_stack[0] = Undefined;
 }
 
 void json::RawParser::reset() {
@@ -82,6 +84,8 @@ void json::RawParser::reset() {
     m_stack_top = 0;
     m_parse_flags = 0;
     m_buffer_sizes[0] = 0;
+    m_buffers[0][0] = 0;
+    m_stack[0] = Undefined;
 }
 
 json::RawParser::~RawParser() {}
@@ -688,9 +692,15 @@ void json::RawParser::parse(char c) {
     TRIGGER_DOCUMENT_END(Value);
 }
 
-void json::RawParser::write(const char *data, size_t len) {
-    for(size_t i = 0; i < len; ++i) {
+void json::RawParser::write(const char *data) {
+    for(size_t i = 0; data[i]; ++i) {
         write(data[i]);
+    }
+}
+
+void json::RawParser::write(uint8_t *data, size_t len) {
+    for(size_t i = 0; i < len; ++i) {
+        write((char)data[i]);
     }
 }
 

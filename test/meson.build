@@ -1,12 +1,9 @@
-test_development = executable(
-    'test_development',
-    src_files + [files('dev_main.cpp')],
-    cpp_args: [],
-    dependencies: [
-        meson.get_compiler('cpp').find_library('boost_unit_test_framework')
-    ],
+manual_testing = executable(
+    'manual_testing',
+    src_files + [files('manual_testing.cpp')],
+    cpp_args: ['-DJSONSTREAM_DEVELOPMENT'],
+    dependencies: [],
     include_directories: inc_directory)
-
 
 
 json_test_suite_array_failures = executable(
@@ -107,3 +104,14 @@ json_test_suite_structure_successes = executable(
     ],
     include_directories: inc_directory)
 test('json_test_suite_structure_successes', json_test_suite_structure_successes, env : [ 'BOOST_TEST_LOG_LEVEL=message'])
+
+
+json_samples = executable(
+    'json_samples',
+    src_files + [files('json_samples.cpp')],
+    cpp_args: ['-DJSONSTREAM_DEVELOPMENT'],
+    dependencies: [
+        meson.get_compiler('cpp').find_library('boost_unit_test_framework')
+    ],
+    include_directories: inc_directory)
+test('json_samples', json_samples, env : [ 'BOOST_TEST_LOG_LEVEL=message'])

@@ -10,7 +10,8 @@
         "streambuf": "cpp",
         "random": "cpp",
         "complex": "cpp",
-        "cmath": "cpp"
+        "cmath": "cpp",
+        "string": "cpp"
     },
     "editor.tabSize": 4,
     "editor.insertSpaces": false,
