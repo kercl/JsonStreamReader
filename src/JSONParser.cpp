@@ -93,7 +93,7 @@ bool json::RawParser::is_whitespace(char c) {
     }
 }
 
-inline void json::RawParser::push(Type structure) {
+inline void json::RawParser::push(ParserState structure) {
     if(m_stack_top == JSONSTREAM_STACK_LIMIT - 1) {
         JSONSTREAM_ERROR(ErrorOutOfMemory)
     }
@@ -101,7 +101,7 @@ inline void json::RawParser::push(Type structure) {
     m_stack[m_stack_top++] = structure;
 }
 
-inline json::Type json::RawParser::pop() {
+inline json::ParserState json::RawParser::pop() {
     if(m_stack_top == 0) {
         JSONSTREAM_ERROR2(ErrorStackEmpty, Undefined);
     }
@@ -109,7 +109,7 @@ inline json::Type json::RawParser::pop() {
     return m_stack[--m_stack_top];
 }
 
-inline json::Type json::RawParser::peek() {
+inline json::ParserState json::RawParser::peek() {
     if(m_stack_top == 0) {
         JSONSTREAM_ERROR2(ErrorStackEmpty, Undefined);
     }

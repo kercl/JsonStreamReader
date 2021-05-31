@@ -106,7 +106,7 @@ typedef uint64_t stack_int_t;
 #   define DEF_TRIGGER_ARRAY_EMPTY
 #endif
 
-enum Type: uint8_t {
+enum ParserState: uint8_t {
     DocumentObject,
     DocumentArray,
     Object,
@@ -125,6 +125,8 @@ enum Type: uint8_t {
     Undefined
 };
 
+typedef ParserState Type;
+
 class Path;
 
 class RawParser {
@@ -132,7 +134,7 @@ private:
     friend class Path;
 
     char m_buffers[JSONSTREAM_MAX_DEPTH][JSONSTREAM_BUFFER_LIMIT];
-    Type m_stack[JSONSTREAM_STACK_LIMIT];
+    ParserState m_stack[JSONSTREAM_STACK_LIMIT];
     buffer_int_t m_buffer_sizes[JSONSTREAM_MAX_DEPTH];
     stack_int_t m_buffer_level, m_stack_top;
     uint8_t m_parse_flags;
@@ -140,9 +142,9 @@ private:
     uint8_t unicode_idx;
     uint16_t unicode_codepoint;
 
-    inline void push(Type state);
-    inline Type pop();
-    inline Type peek();
+    inline void push(ParserState state);
+    inline ParserState pop();
+    inline ParserState peek();
 
     inline void descend();
     inline void ascend();
