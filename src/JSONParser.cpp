@@ -1,7 +1,10 @@
-#include <iostream>
-#include <cstring>
-#include <cstdio>
 #include "JSONParser.h"
+
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+#include <limits.h>
+#include <math.h>
+#include <float.h>
+#endif
 
 #if defined __has_cpp_attribute
     #if __has_cpp_attribute(fallthrough)
@@ -37,10 +40,11 @@
 
 
 #ifdef JSONSTREAM_CERR_ERROR_MSG
+#   include <iostream>
 #   define JSONSTREAM_ERROR2(err_code, ret)                \
         JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_INVALID);  \
         std::cerr << __FILE__ << ":" << __LINE__ <<        \
-                     ": error: " << err_code << std::endl; \
+                     ": error: " << (err_code) << std::endl; \
         on_error(ErrorUnexpectedCharacter);                \
         return ret;
 #else
@@ -597,7 +601,6 @@ void json::RawParser::parse(char c) {
         }
         TRIGGER_DOCUMENT_BEGIN(Value);
         push(Value);
-        //JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
 
     switch(peek()) {
@@ -684,6 +687,12 @@ void json::RawParser::parse(char c) {
     TRIGGER_DOCUMENT_END(Value);
 }
 
+void json::RawParser::write(const char *data, size_t len) {
+    for(size_t i = 0; i < len; ++i) {
+        write(data[i]);
+    }
+}
+
 void json::RawParser::write(char c) {
     parse(c);
 }
@@ -692,12 +701,154 @@ void json::RawParser::end_of_transmission() {
     if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_INVALID)) {
         return;
     }
+    parse('\n');
 
     JSONSTREAM_ASSERT(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_ENDED),
                       ErrorDocumentNotClosed);
 
     reset();
 }
+
+
+bool json::Parser::add_digit(int *number, uint8_t digit) {
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+    if(*number > INT_MAX / 10) {
+        return false;
+    }
+#endif
+    *number *= 10;
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+    if(*number > INT_MAX - digit) {
+        return false;
+    }
+#endif
+    *number += digit;
+    return true;
+}
+
+// TODO: loss of significance check is not working properly yet
+void json::Parser::on_number(const Path& path, const char *str) {
+    int8_t is_signed = 0, exp_is_signed = 0;
+
+#ifndef JSONSTREAM_ALL_NUMBERS_FLOAT
+    if(!JSONSTREAM_FLAG_IS_SET(JSONSTREAM_NUM_HAS_COMMA) &&
+       !JSONSTREAM_FLAG_IS_SET(JSONSTREAM_NUM_IS_EXP))
+    {
+        int parsed_num = 0;
+        if(str[0] == '-') {
+            is_signed = 1;
+        }
+        for(int8_t i = is_signed; i < m_buffer_sizes[m_buffer_level] - 1; ++i) {
+            bool success = add_digit(&parsed_num, str[i] - '0');
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+            JSONSTREAM_ASSERT(success, is_signed ? ErrorUnderflow : ErrorOverflow);
+#endif
+        }
+
+        on_integer(path, parsed_num * (1 - (is_signed << 1)));
+        return;
+    }
+#endif
+
+    int32_t num_parts[3] = {0, 0, 0};
+    int8_t part_idx = 0, post_comma_digits = 0;
+    float result = 0.0f;
+
+    if(str[0] == '-') {
+        is_signed = 1;
+    }
+
+    for(int8_t i = is_signed; i < m_buffer_sizes[m_buffer_level] - 1; ++i) {
+        if(str[i] == '.') {
+            part_idx = 1;
+        } else if(str[i] == 'e' || str[i] == 'E') {
+            part_idx = 2;
+            if(str[i + 1] == '-') {
+                exp_is_signed = 1;
+                ++i;
+            } else if(str[i + 1] == '+') {
+                ++i;
+            }
+        } else {
+            bool success = add_digit(&num_parts[part_idx], str[i] - '0');
+
+            if(part_idx == 0) {
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+                JSONSTREAM_ASSERT(success, is_signed ? ErrorUnderflow : ErrorOverflow);
+#endif
+            } else if(part_idx == 1) {
+#ifdef JSONSTREAM_CHECK_LOSS_OF_SIGNIFICANCE
+                JSONSTREAM_ASSERT(success, ErrorLossOfSignificance);
+#endif
+                if(success) {
+                    ++post_comma_digits;
+                }
+            } else {
+                if(exp_is_signed) {
+#ifdef JSONSTREAM_CHECK_LOSS_OF_SIGNIFICANCE
+                    JSONSTREAM_ASSERT(success, ErrorLossOfSignificance);
+#endif
+                } else {
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+                    JSONSTREAM_ASSERT(success, ErrorOverflow);
+#endif
+                }
+
+            }
+        }
+    }
+
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+    JSONSTREAM_ASSERT(num_parts[2] < FLT_MAX_10_EXP, ErrorOverflow);
+#endif
+
+    result = num_parts[1];
+    while(post_comma_digits > 0) {
+        if(post_comma_digits >= 8) {
+            result *= 1e-8f;
+            post_comma_digits -= 8;
+        } else if(post_comma_digits >= 4) {
+            result *= 1e-4f;
+            post_comma_digits -= 4;
+        } else if(post_comma_digits >= 2) {
+            result *= 1e-2f;
+            post_comma_digits -= 2;
+        } else if(post_comma_digits >= 1) {
+            result *= 1e-1f;
+            post_comma_digits -= 1;
+        }
+    }
+
+    result += num_parts[0];
+
+    const float factors_n[] = {1e-1f, 1e-2f, 1e-4f, 1e-8f, 1e-16f, 1e-32f},
+                factors_p[] = {1e+1f, 1e+2f, 1e+4f, 1e+8f, 1e+16f, 1e+32f};
+
+    while(num_parts[2] > 0) {
+        for(uint8_t i = 5; i != 0; --i) {
+            if(num_parts[2] >= (1 << i)) {
+                result *= exp_is_signed ? factors_n[i] : factors_p[i];
+                num_parts[2] -= 1 << i;
+                break;
+            }
+        }
+    }
+
+#ifdef JSONSTREAM_CHECK_OVERFLOWS
+    JSONSTREAM_ASSERT(!isinf(result), is_signed ? ErrorUnderflow : ErrorOverflow);
+#endif
+
+    on_float(path, result * (is_signed ? -1.0f : 1.0f));
+}
+
+void json::Parser::on_true(const Path& path) {
+    on_boolean(path, true);
+}
+
+void json::Parser::on_false(const Path& path) {
+    on_boolean(path, false);
+}
+
 
 json::Path::Path(const json::RawParser *parser) : m_parser(parser) {}
 

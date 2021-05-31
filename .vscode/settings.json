@@ -9,7 +9,8 @@
         "ostream": "cpp",
         "streambuf": "cpp",
         "random": "cpp",
-        "complex": "cpp"
+        "complex": "cpp",
+        "cmath": "cpp"
     },
     "editor.tabSize": 4,
     "editor.insertSpaces": false,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "JSONConfig.h"
 #include "JSONErrors.h"
@@ -128,10 +129,12 @@ enum ParserState: uint8_t {
 typedef ParserState Type;
 
 class Path;
+class Parser;
 
 class RawParser {
 private:
     friend class Path;
+    friend class Parser;
 
     char m_buffers[JSONSTREAM_MAX_DEPTH][JSONSTREAM_BUFFER_LIMIT];
     ParserState m_stack[JSONSTREAM_STACK_LIMIT];
@@ -175,7 +178,8 @@ public:
     void parse(char c);
     void end_of_transmission();
 
-    virtual void write(char c);
+    void write(const char *data, size_t len);
+    void write(char c);
     void dump_state();
 
     DEF_TRIGGER_DOCUMENT_BEGIN;
@@ -197,24 +201,24 @@ public:
 };
 
 class Parser : public RawParser {
+    bool add_digit(int *number, uint8_t digit);
 public:
     virtual void on_number(const Path& path, const char *str) override;
     virtual void on_true(const Path& path) override;
     virtual void on_false(const Path& path) override;
 
-    virtual void on_int(const Path& path, int value) = 0;
+    virtual void on_integer(const Path& path, int value) = 0;
     virtual void on_float(const Path& path, float value) = 0;
-    virtual void on_boolean(const Path path, bool value) = 0;
-    virtual void on_null(const Path& path) = 0;
+    virtual void on_boolean(const Path& path, bool value) = 0;
 };
 
 class Path {
     friend class RawParser;
 
     const RawParser *m_parser;
-
-    Path(const RawParser *parser);
 public:
+    Path(const RawParser *parser);
+
     int as_index(unsigned int i) const;
     const char* as_name(unsigned int i) const;
 

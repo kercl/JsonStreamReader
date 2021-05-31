@@ -11,7 +11,10 @@ enum ErrorCode {
     ErrorNotImplemented,
     ErrorUnknownEscapeCharacter,
     ErrorDocumentNotClosed,
-    ErrorUnescapedControlCharacter
+    ErrorUnescapedControlCharacter,
+    ErrorOverflow,
+    ErrorUnderflow,
+    ErrorLossOfSignificance
 };
 
 }
