@@ -4,7 +4,7 @@ This library contains a small space-efficient parser for JSON documents that
 respects the [ECMA 404 (2nd edition, december 2017)](https://www.ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf)
 standard.
 
-## But why?
+## Motivation
 
 I was working on a project that required to parse rather large JSON documents
 on an Arduino. While there are perfectly fine streaming parser out there
