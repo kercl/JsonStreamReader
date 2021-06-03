@@ -140,7 +140,7 @@ private:
 public:
 #endif
     char m_buffers[JSONSTREAM_MAX_DEPTH][JSONSTREAM_BUFFER_LIMIT];
-    ParserState m_stack[JSONSTREAM_STACK_LIMIT];
+    ParserState m_stack[JSONSTREAM_STACK_LIMIT + 1];
     buffer_int_t m_buffer_sizes[JSONSTREAM_MAX_DEPTH];
     stack_int_t m_buffer_level, m_stack_top;
     uint8_t m_parse_flags;
@@ -152,16 +152,16 @@ public:
     inline ParserState pop();
     inline ParserState peek();
 
-    inline void descend();
-    inline void ascend();
-    inline void clear_data();
+    void descend();
+    void ascend();
+    void clear_data();
 
-    inline void buffer_append_char(char c);
-    inline void buffer_assign_int(int i);
-    inline int buffer_as_int();
-    inline void buffer_increment_int();
-    inline char buffer_last();
-    inline char buffer_first();
+    void buffer_append_char(char c);
+    void buffer_assign_int(int i);
+    int buffer_as_int();
+    void buffer_increment_int();
+    char buffer_last();
+    char buffer_first();
 
     bool is_whitespace(char c);
 

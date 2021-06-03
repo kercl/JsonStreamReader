@@ -13,11 +13,19 @@
 using namespace std;
 
 const char *test_json = R"json(
-{
-  "mainly": true,
-  "get": "shot",
-  "dry": "safety"
-}
+	{
+		"wave": [
+			"signal",
+			2085066803.059366,
+			-1972210410.9708362
+		],
+		"goes": 198620571.2804947,
+		"raw": {
+			"enjoy": "current",
+			"throughout": "fastened",
+			"setting": false
+		}
+	}
 )json";
 
 int main(int argc, char **argv) {

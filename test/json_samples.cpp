@@ -134,8 +134,28 @@ BOOST_AUTO_TEST_CASE(valid_sample_documents) {
 			"OBJECT END:    \n"
 			"DOCUMENT END   (Object)\n"
 		) == 0);
+
 	BOOST_TEST(parser.m_last_error == json::NoError);
+	BOOST_TEST_MESSAGE("==============\n");
 	BOOST_TEST_MESSAGE(parser.output_data.str());
+	BOOST_TEST_MESSAGE("==============\n");
+	BOOST_TEST_MESSAGE(
+			"DOCUMENT BEGIN (Object)\n"
+			"OBJECT BEGIN:  \n"
+			"ARRAY  BEGIN:  [wave]\n"
+			"VALUE  STRING: [wave]<0> --> signal\n"
+			"VALUE  NUMBER: [wave]<1> --> 2085066803.059366\n"
+			"VALUE  NUMBER: [wave]<2> --> -1972210410.9708362\n"
+			"ARRAY  END:    [wave]\n"
+			"VALUE  NUMBER: [goes] --> 198620571.2804947\n"
+			"OBJECT BEGIN:  [raw]\n"
+			"VALUE  STRING: [raw][enjoy] --> current\n"
+			"VALUE  STRING: [raw][throughout] --> fastened\n"
+			"VALUE  FALSE:  [raw][setting] --> false\n"
+			"OBJECT END:    [raw]\n"
+			"OBJECT END:    \n"
+			"DOCUMENT END   (Object)\n"
+	);
 	parser.reset();
 	parser.output_data.str(std::string());
 }

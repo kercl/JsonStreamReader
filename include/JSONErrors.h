@@ -5,9 +5,9 @@ namespace json {
 enum ErrorCode {
     NoError = 0,
     ErrorOutOfMemory,
-    ErrorUnexpectedCharacter,
     ErrorStackEmpty,
     ErrorBufferEmpty,
+    ErrorUnexpectedCharacter,
     ErrorNotImplemented,
     ErrorUnknownEscapeCharacter,
     ErrorDocumentNotClosed,

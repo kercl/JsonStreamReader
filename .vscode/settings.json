@@ -11,7 +11,8 @@
         "random": "cpp",
         "complex": "cpp",
         "cmath": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "istream": "cpp"
     },
     "editor.tabSize": 4,
     "editor.insertSpaces": false,
