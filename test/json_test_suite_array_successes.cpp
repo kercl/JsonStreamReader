@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_ARRAY_SUCCESSES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_SUCCESS(y_array_arraysWithSpaces,    R"json(  [[]   ]  )json")
 JSON_PARSER_EXPECT_SUCCESS(y_array_empty,               R"json(  []  )json")

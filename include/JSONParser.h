@@ -157,7 +157,6 @@ public:
     void descend();
     void ascend();
     void buffer_append_char(char c);
-    void buffer_set_char(char c);
     void buffer_assign_int(int i);
     int buffer_segment_as_int(unsigned int i) const;
     const char* buffer_segment(unsigned int i) const;

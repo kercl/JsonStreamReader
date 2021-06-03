@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_NUMBER_FAILURES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_FAILURE(n_number_multidigit_then_00,                R"json(  123\0\0  )json")
 JSON_PARSER_EXPECT_FAILURE(n_number_0dot1dot2,                         R"json(  [0.1.2]  )json")

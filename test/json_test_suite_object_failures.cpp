@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_OBJECT_FAILURES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_FAILURE(n_object_bad_value,                                        R"json(  ["x", truth]  )json")
 JSON_PARSER_EXPECT_FAILURE(n_object_bracket_key,                                      R"json(  {[: "x"}  )json")

@@ -1,10 +1,11 @@
 import itertools
 import json
 
-shorts = ['s', '0', 't', 'f', 'n', '${}', '$[]']
+# shorts = ['s', '0', 't', 'f', 'n', '${}', '$[]']
+shorts = ['s', '0', '${}', '$[]']
 
-some_numbers = ["-23", "-3", "0", "5", "73", "-3.3", "0.23", "6546.3", "5e+1", "-3.2e-3"]
-some_strings = ["Lorem", "ipsum", "dolor", "sit", "amet", "consetetur", "sadipscing", "elitr", "sed", "diam"]
+some_numbers = ["0"]
+some_strings = ["str"]
 
 def generate(seed_doc, max_depth, content_max_length, depth):
 	if depth == max_depth:
@@ -53,7 +54,7 @@ def translate(max_depth, context_max_length):
 				result += prefix + 'null'
 			elif c == '{':
 				result += prefix + '{'
-				prefix_stack.append(',"' + some_strings[str_idx] + '_{}":')
+				prefix_stack.append(',"' + some_strings[str_idx] + '{}":')
 				str_idx = (str_idx + 1) % len(some_strings)
 				key_counter = 0
 			elif c == '}':
@@ -68,5 +69,5 @@ def translate(max_depth, context_max_length):
 
 		yield result.replace("{,", "{").replace("[,", "[")
 
-for doc in translate(2, 2):
-	print(json.loads(doc))
+for doc in translate(2, 3):
+	print(doc)

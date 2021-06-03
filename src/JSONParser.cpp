@@ -119,13 +119,6 @@ void json::RawParser::buffer_append_char(char c) {
     m_buffer_segments[m_buffer_level + 1]++;
 }
 
-void json::RawParser::buffer_set_char(char c) {
-    if(buffer_segment_length(m_buffer_level)) {
-        buffer_append_char(c);
-    }
-    m_buffer[m_buffer_segments[m_buffer_level]] = c;
-}
-
 void json::RawParser::buffer_assign_int(int i) {
     int *data = (int*)&m_buffer[m_buffer_segments[m_buffer_level]];
     *data = i;

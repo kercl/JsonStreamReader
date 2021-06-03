@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_ARRAY_FAILURES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_FAILURE(n_array_1_true_without_comma,          R"json(  [1 true]     )json")
 JSON_PARSER_EXPECT_FAILURE(n_array_a_invalid_utf8,                R"json(  [a�]         )json")

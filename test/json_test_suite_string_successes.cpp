@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_STRING_SUCCESSES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_SUCCESS(y_string_1_2_3_bytes_UTF_8_sequences,             R"json(  ["\u0060\u012a\u12AB"]  )json")
 JSON_PARSER_EXPECT_SUCCESS(y_string_accepted_surrogate_pair,                 R"json(  ["\uD801\udc37"]  )json")

@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_STRUCTURE_FAILURES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_FAILURE(n_structure_angle_bracket_dot,                             R"json(  <.>  )json")
 JSON_PARSER_EXPECT_FAILURE(n_structure_angle_bracket_null,                            R"json(  [<null>]  )json")

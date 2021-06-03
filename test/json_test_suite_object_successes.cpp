@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_OBJECT_SUCCESSES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_SUCCESS(y_object_basic,                    R"json(  {"asd":"sdf"}  )json")
 JSON_PARSER_EXPECT_SUCCESS(y_object_duplicated_key_and_value, R"json(  {"a":"b","a":"b"}  )json")

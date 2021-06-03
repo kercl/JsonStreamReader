@@ -3,7 +3,7 @@
 #include <cmath>
 
 #include "JSONParser.h"
-#include "parser.h"
+#include "TestParser.h"
 
 #define XSTR(x) STR(x)
 #define STR(x) #x
@@ -12,15 +12,7 @@
 
 using namespace std;
 
-const char *test_json = R"json({
-	"done": {
-		"having": true,
-		"command": false,
-		"younger": +
-	},
-	"shut": true,
-	"till": true
-    })json";
+const char *test_json = R"json({])json";
 
 int main(int argc, char **argv) {
     SUPPRESS_UNUSED(argc);
@@ -66,7 +58,7 @@ int main(int argc, char **argv) {
     }
     cout << ")\n";
 
-    cout << test.m_last_error << endl;
+    cout << sizeof(json::RawParser) << endl;
 
 
     test.reset();

@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_NUMBER_SUCCESSES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_SUCCESS(y_number_0e_plus_1,              R"json(  [0e+1]  )json")
 JSON_PARSER_EXPECT_SUCCESS(y_number_0e1,                    R"json(  [0e1]  )json")

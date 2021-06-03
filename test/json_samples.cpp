@@ -3,7 +3,7 @@
 #include <boost/test/unit_test.hpp>
 #include <sstream>
 
-#include "parser.h"
+#include "TestParser.h"
 
 #define JSON_OUTPUT_TEST(in, out, err_code) \
 	parser.write(in); \
@@ -15,8 +15,11 @@
 	parser.reset(); \
 	parser.output_data.str(std::string());
 
-#define JSON_OUTPUT_TEST_SUCCESS(in, out) JSON_OUTPUT_TEST(in, out, ==json::NoError)
-#define JSON_OUTPUT_TEST_FAILURE(in, out) JSON_OUTPUT_TEST(in, out, !=json::NoError)
+#define JSON_OUTPUT_TEST_SUCCESS(in, out) \
+	JSON_OUTPUT_TEST(in, out, ==json::NoError)
+
+#define JSON_OUTPUT_TEST_FAILURE(in, out) \
+	JSON_OUTPUT_TEST(in, out, !=json::NoError)
 
 BOOST_AUTO_TEST_CASE(valid_sample_documents) {
 	TestParser parser(true, true);
@@ -337,6 +340,12 @@ BOOST_AUTO_TEST_CASE(invalid_sample_documents) {
 			"shut": true,
 			"till": true
 		})json",
+		"DOCUMENT BEGIN (Object)\n"
+		"OBJECT BEGIN:  \n"
+		"ERROR: Unexpected character.\n")
+
+	JSON_OUTPUT_TEST_FAILURE(
+		R"json({])json",
 		"DOCUMENT BEGIN (Object)\n"
 		"OBJECT BEGIN:  \n"
 		"ERROR: Unexpected character.\n")

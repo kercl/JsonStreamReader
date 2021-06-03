@@ -2,7 +2,7 @@
 #define BOOST_TEST_MODULE JSON_TEST_SUITE_STRING_FAILURES
 #include <boost/test/unit_test.hpp>
 
-#include "parser.h"
+#include "TestParser.h"
 
 JSON_PARSER_EXPECT_FAILURE(n_string_1_surrogate_then_escape,              R"json(  ["\uD800\"]  )json")
 JSON_PARSER_EXPECT_FAILURE(n_string_1_surrogate_then_escape_u1,           R"json(  ["\uD800\u1"]  )json")
