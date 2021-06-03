@@ -101,10 +101,6 @@ bool json::RawParser::is_whitespace(char c) {
     }
 }
 
-// #define push(structure) m_stack[m_stack_top++] = structure
-// #define pop() m_stack[--m_stack_top]
-// #define peek() m_stack[m_stack_top - 1]
-
 inline void json::RawParser::push(ParserState structure) {
     m_stack[m_stack_top++] = structure;
 }
@@ -118,8 +114,7 @@ inline json::ParserState json::RawParser::peek() {
 }
 
 void json::RawParser::buffer_append_char(char c) {
-    if(m_buffer_level == JSONSTREAM_MAX_DEPTH || 
-       m_buffer_sizes[m_buffer_level] == JSONSTREAM_BUFFER_LIMIT)
+    if(m_buffer_sizes[m_buffer_level] == JSONSTREAM_BUFFER_LIMIT)
     {
         JSONSTREAM_ERROR(ErrorOutOfMemory);
     }
@@ -142,7 +137,6 @@ int json::RawParser::buffer_as_int() {
 void json::RawParser::buffer_increment_int() {
     int *data = (int*)&m_buffers[m_buffer_level][0];
     *data = *data + 1;
-    m_buffer_sizes[m_buffer_level] = sizeof(int);
 }
 
 char json::RawParser::buffer_last() {
