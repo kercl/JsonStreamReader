@@ -139,10 +139,12 @@ private:
 #ifdef JSONSTREAM_DEVELOPMENT
 public:
 #endif
-    char m_buffers[JSONSTREAM_MAX_DEPTH][JSONSTREAM_BUFFER_LIMIT];
+    char m_buffer[JSONSTREAM_BUFFER_LIMIT + 1], m_previous_char;
+    buffer_int_t m_buffer_segments[JSONSTREAM_MAX_DEPTH + 1];
+
     ParserState m_stack[JSONSTREAM_STACK_LIMIT + 1];
-    buffer_int_t m_buffer_sizes[JSONSTREAM_MAX_DEPTH];
     stack_int_t m_buffer_level, m_stack_top;
+
     uint8_t m_parse_flags;
 
     uint8_t unicode_idx;
@@ -154,14 +156,13 @@ public:
 
     void descend();
     void ascend();
-    void clear_data();
-
     void buffer_append_char(char c);
+    void buffer_set_char(char c);
     void buffer_assign_int(int i);
-    int buffer_as_int();
+    int buffer_segment_as_int(unsigned int i) const;
+    const char* buffer_segment(unsigned int i) const;
+    buffer_int_t buffer_segment_length(unsigned int i) const;
     void buffer_increment_int();
-    char buffer_last();
-    char buffer_first();
 
     bool is_whitespace(char c);
 

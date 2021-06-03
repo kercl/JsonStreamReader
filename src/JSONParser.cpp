@@ -20,8 +20,9 @@
 #define JSONSTREAM_CHAR_UNICODE     (1 << 1)
 #define JSONSTREAM_NUM_HAS_COMMA    (1 << 2)
 #define JSONSTREAM_NUM_IS_EXP       (1 << 3)
-#define JSONSTREAM_DOCUMENT_INVALID (1 << 4)
-#define JSONSTREAM_DOCUMENT_ENDED   (1 << 5)
+#define JSONSTREAM_NUM_IS_NEG       (1 << 4)
+#define JSONSTREAM_DOCUMENT_INVALID (1 << 5)
+#define JSONSTREAM_DOCUMENT_ENDED   (1 << 6)
 
 #define JSONSTREAM_FLAG_CLEAR(flags) (m_parse_flags &= ~(flags))
 #define JSONSTREAM_FLAG_SET(flags) (m_parse_flags |= flags)
@@ -44,7 +45,7 @@
         JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_INVALID);  \
         std::cerr << __FILE__ << ":" << __LINE__ <<        \
                      ": error: " << (err_code) << std::endl; \
-        on_error(ErrorUnexpectedCharacter);                \
+        on_error(err_code);                \
         return ret;
 #else
 #   define JSONSTREAM_ERROR2(err_code, ret)                \
@@ -68,23 +69,18 @@
         JSONSTREAM_ERROR(ErrorUnexpectedCharacter) \
     }
 
-json::RawParser::RawParser()
-    : m_buffer_level(0)
-    , m_stack_top(0)
-    , m_parse_flags(0)
-{
-    m_buffer_sizes[0] = 0;
-    m_buffers[0][0] = 0;
-    m_stack[0] = Undefined;
+json::RawParser::RawParser() {
+    reset();
 }
 
 void json::RawParser::reset() {
     m_buffer_level = 0;
     m_stack_top = 0;
     m_parse_flags = 0;
-    m_buffer_sizes[0] = 0;
-    m_buffers[0][0] = 0;
     m_stack[0] = Undefined;
+
+    m_buffer_segments[0] = 0;
+    m_buffer_segments[1] = 0;
 }
 
 json::RawParser::~RawParser() {}
@@ -114,47 +110,49 @@ inline json::ParserState json::RawParser::peek() {
 }
 
 void json::RawParser::buffer_append_char(char c) {
-    if(m_buffer_sizes[m_buffer_level] == JSONSTREAM_BUFFER_LIMIT)
+    if(m_buffer_segments[m_buffer_level + 1] == JSONSTREAM_BUFFER_LIMIT)
     {
         JSONSTREAM_ERROR(ErrorOutOfMemory);
     }
 
-    m_buffers[m_buffer_level][m_buffer_sizes[m_buffer_level]] = c;
-    m_buffer_sizes[m_buffer_level]++;
+    m_buffer[m_buffer_segments[m_buffer_level + 1]] = c;
+    m_buffer_segments[m_buffer_level + 1]++;
+}
+
+void json::RawParser::buffer_set_char(char c) {
+    if(buffer_segment_length(m_buffer_level)) {
+        buffer_append_char(c);
+    }
+    m_buffer[m_buffer_segments[m_buffer_level]] = c;
 }
 
 void json::RawParser::buffer_assign_int(int i) {
-    int *data = (int*)&m_buffers[m_buffer_level][0];
+    int *data = (int*)&m_buffer[m_buffer_segments[m_buffer_level]];
     *data = i;
-    m_buffer_sizes[m_buffer_level] = sizeof(int);
+    m_buffer_segments[m_buffer_level + 1] = m_buffer_segments[m_buffer_level] + sizeof(int);
 }
 
-int json::RawParser::buffer_as_int() {
-    int *data = (int*)&m_buffers[m_buffer_level][0];
-    return *data;
+int json::RawParser::buffer_segment_as_int(unsigned int i) const {
+    return *(int*)&m_buffer[m_buffer_segments[i]];
+}
+
+const char* json::RawParser::buffer_segment(uint i) const {
+    return &m_buffer[m_buffer_segments[i]];
+}
+
+json::buffer_int_t json::RawParser::buffer_segment_length(unsigned int i) const {
+    return m_buffer_segments[i + 1] - m_buffer_segments[i];
 }
 
 void json::RawParser::buffer_increment_int() {
-    int *data = (int*)&m_buffers[m_buffer_level][0];
+    int *data = (int*)&m_buffer[m_buffer_segments[m_buffer_level]];
     *data = *data + 1;
-}
-
-char json::RawParser::buffer_last() {
-    if(m_buffer_sizes[m_buffer_level] == 0) {
-        return '\0';
-    }
-    return m_buffers[m_buffer_level][m_buffer_sizes[m_buffer_level] - 1];
-}
-
-char json::RawParser::buffer_first() {
-    if(m_buffer_sizes[m_buffer_level] == 0) {
-        return '\0';
-    }
-    return m_buffers[m_buffer_level][0];
+    m_buffer_segments[m_buffer_level + 1] = m_buffer_segments[m_buffer_level] + sizeof(int);
 }
 
 void json::RawParser::descend() {
-    m_buffer_sizes[++m_buffer_level] = 0;
+    ++m_buffer_level;
+    m_buffer_segments[m_buffer_level + 1] = m_buffer_segments[m_buffer_level];
 }
 
 void json::RawParser::ascend() {
@@ -162,11 +160,8 @@ void json::RawParser::ascend() {
         JSONSTREAM_ERROR(ErrorBufferEmpty);
     }
 
-    m_buffer_sizes[--m_buffer_level] = 0;
-}
-
-void json::RawParser::clear_data() {
-    m_buffer_sizes[m_buffer_level] = 0;
+    --m_buffer_level;
+    m_buffer_segments[m_buffer_level + 1] = m_buffer_segments[m_buffer_level];
 }
 
 void json::RawParser::parse_object(char c) {
@@ -270,8 +265,12 @@ void json::RawParser::parse_value(char c) {
     if(JSONSTREAM_IS_DIGIT(c) || c == '-') {
         push(Number);
         JSONSTREAM_FLAG_CLEAR(JSONSTREAM_NUM_HAS_COMMA | JSONSTREAM_NUM_IS_EXP);
+        if(c == '-') {
+            JSONSTREAM_FLAG_SET(JSONSTREAM_NUM_IS_NEG);
+        } else {
+            JSONSTREAM_FLAG_CLEAR(JSONSTREAM_NUM_IS_NEG);
+        }
 
-        JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(c) || c == '-');
         buffer_append_char(c);
         return;
     }
@@ -289,16 +288,15 @@ void json::RawParser::parse_value(char c) {
         return;
     case '\"':
         push(StringBegin);
-        //parse_string(c);
         return;
     case 't':
-        parse_true(c);
+        push(ValueTrue);
         return;
     case 'f':
-        parse_false(c);
+        push(ValueFalse);
         return;
     case 'n':
-        parse_null(c);
+        push(ValueNull);
         return;
     default:
         break;
@@ -348,10 +346,9 @@ void json::RawParser::parse_string(char c) {
     } else if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_CHAR_UNICODE)) {
         JSONSTREAM_EXPECT(JSONSTREAM_IS_HEX(c));
 
-        if(c >= 'a') {
-            unicode_codepoint = (unicode_codepoint << 4) + c - 'a' + 0xa;
-        } else if(c >= 'A') {
-            unicode_codepoint = (unicode_codepoint << 4) + c - 'A' + 0xa;
+        if((c & 0xdf) >= 'A') { // & 0xdf = to upper case
+            unicode_codepoint = (unicode_codepoint << 4) 
+                                + (c & 0xdf) - 'A' + 0xa;
         } else if(c >= '0') {
             unicode_codepoint = (unicode_codepoint << 4) + (c - '0');
         }
@@ -395,28 +392,30 @@ void json::RawParser::parse_string(char c) {
 }
 
 void json::RawParser::parse_number(char c) {
-    switch(m_buffer_sizes[m_buffer_level]) {
+    switch(buffer_segment_length(m_buffer_level)) {
     case 1:
         if(JSONSTREAM_IS_DIGIT(c)) {
-            JSONSTREAM_EXPECT(buffer_last() != '0');
+            JSONSTREAM_EXPECT(m_previous_char != '0');
             buffer_append_char(c);
             return;
         }
-        if(buffer_last() == '-') {
+        if(m_previous_char == '-') {
             JSONSTREAM_EXPECT(JSONSTREAM_IS_DIGIT(c));
             buffer_append_char(c);
             return;
         }
         break;
     case 2:
-        if(c == '0' && buffer_first() == '-') {
-            JSONSTREAM_EXPECT(buffer_last() != '0');
-            buffer_append_char(c);
-            return;
-        }
-        if(buffer_first() == '-' && buffer_last() == '0') {
-            JSONSTREAM_EXPECT(!JSONSTREAM_IS_DIGIT(c));
-            break;
+        if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_NUM_IS_NEG)) {
+            if(c == '0') {
+                JSONSTREAM_EXPECT(m_previous_char != '0');
+                buffer_append_char(c);
+                return;
+            }
+            if(m_previous_char == '0') {
+                JSONSTREAM_EXPECT(!JSONSTREAM_IS_DIGIT(c));
+                break;
+            }
         }
         if(JSONSTREAM_IS_DIGIT(c)) {
             buffer_append_char(c);
@@ -432,7 +431,7 @@ void json::RawParser::parse_number(char c) {
         JSONSTREAM_EXPECT(
             JSONSTREAM_FLAG_IS_CLEARED(
                 JSONSTREAM_NUM_HAS_COMMA | JSONSTREAM_NUM_IS_EXP)
-            && JSONSTREAM_IS_DIGIT(buffer_last()));
+            && JSONSTREAM_IS_DIGIT(m_previous_char));
 
         JSONSTREAM_FLAG_SET(JSONSTREAM_NUM_HAS_COMMA);
         buffer_append_char(c);
@@ -441,7 +440,7 @@ void json::RawParser::parse_number(char c) {
     case 'E':
         JSONSTREAM_EXPECT(
             JSONSTREAM_FLAG_IS_CLEARED(JSONSTREAM_NUM_IS_EXP)
-            && JSONSTREAM_IS_DIGIT(buffer_last())
+            && JSONSTREAM_IS_DIGIT(m_previous_char)
         );
 
         JSONSTREAM_FLAG_SET(JSONSTREAM_NUM_IS_EXP);
@@ -454,7 +453,7 @@ void json::RawParser::parse_number(char c) {
         }
     }
 
-    switch(buffer_last()) {
+    switch(m_previous_char) {
     case '.':
     case '+':
     case '-':
@@ -475,14 +474,7 @@ void json::RawParser::parse_number(char c) {
 }
 
 void json::RawParser::parse_true(char c) {
-    if(m_buffer_sizes[m_buffer_level] == 0) {
-        JSONSTREAM_EXPECT(c == 't');
-        buffer_append_char('t');
-        push(ValueTrue);
-        return;
-    }
-
-    switch(buffer_last()) {
+    switch(m_previous_char) {
     case 't':
         JSONSTREAM_EXPECT(c == 'r');
         break;
@@ -491,25 +483,15 @@ void json::RawParser::parse_true(char c) {
         break;
     case 'u':
         JSONSTREAM_EXPECT(c == 'e');
-        buffer_append_char('e');
-        buffer_append_char('\0');
         pop();
         return;
     default:
         JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
-    buffer_append_char(c);
 }
 
 void json::RawParser::parse_false(char c) {
-    if(m_buffer_sizes[m_buffer_level] == 0) {
-        JSONSTREAM_EXPECT(c == 'f');
-        buffer_append_char('f');
-        push(ValueFalse);
-        return;
-    }
-    
-    switch(buffer_last()) {
+    switch(m_previous_char) {
     case 'f':
         JSONSTREAM_EXPECT(c == 'a');
         break;
@@ -521,25 +503,15 @@ void json::RawParser::parse_false(char c) {
         break;
     case 's':
         JSONSTREAM_EXPECT(c == 'e');
-        buffer_append_char('e');
-        buffer_append_char('\0');
         pop();
         return;
     default:
         JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
-    buffer_append_char(c);
 }
 
 void json::RawParser::parse_null(char c) {
-    if(m_buffer_sizes[m_buffer_level] == 0) {
-        JSONSTREAM_EXPECT(c == 'n');
-        buffer_append_char('n');
-        push(ValueNull);
-        return;
-    }
-
-    switch(buffer_last()) {
+    switch(m_previous_char) {
     case 'n':
         JSONSTREAM_EXPECT(c == 'u');
         break;
@@ -548,14 +520,11 @@ void json::RawParser::parse_null(char c) {
         break;
     case 'l':
         JSONSTREAM_EXPECT(c == 'l');
-        buffer_append_char('l');
-        buffer_append_char('\0');
         pop();
         return;
     default:
         JSONSTREAM_ERROR(ErrorUnexpectedCharacter);
     }
-    buffer_append_char(c);
 }
 
 void json::RawParser::parse(char c) {
@@ -577,20 +546,23 @@ void json::RawParser::parse(char c) {
     if(m_stack_top == 0) {
         JSONSTREAM_SKIP_WHITESPACES(c);
 
-        if(c == '[') {
+        switch(c) {
+        case '[':
             TRIGGER_DOCUMENT_BEGIN(Array);
             TRIGGER_ARRAY_BEGIN(Path(this));
             push(ArrayBegin);
+            m_previous_char = '[';
             return;
-        }
-        if(c == '{') {
+        case '{':
             TRIGGER_DOCUMENT_BEGIN(Object);
             TRIGGER_OBJECT_BEGIN(Path(this));
             push(ObjectBegin);
+            m_previous_char = '{';
             return;
+        default:
+            TRIGGER_DOCUMENT_BEGIN(Value);
+            push(Value);
         }
-        TRIGGER_DOCUMENT_BEGIN(Value);
-        push(Value);
     }
 
     switch(peek()) {
@@ -599,40 +571,47 @@ void json::RawParser::parse(char c) {
     case ObjectColon:
     case Object:
         parse_object(c);
+        m_previous_char = c;
         return;
     case ArrayBegin:
     case Array:
         parse_array(c);
+        m_previous_char = c;
         return;
     case Value:
         parse_value(c);
+        m_previous_char = c;
         return;
     case StringBegin:
     case String:
         parse_string(c);
         if(peek() == Value) {
             pop();
-            on_string(Path(this), m_buffers[m_buffer_level]);
+            on_string(Path(this), buffer_segment(m_buffer_level));
             if(m_stack_top) {
                 ascend();
+                m_previous_char = c;
                 return;
             }
             break;
         }
+        m_previous_char = c;
         return;
     case Number:
         parse_number(c);
         if(peek() == Value) {
             pop();
-            on_number(Path(this), m_buffers[m_buffer_level]);
+            on_number(Path(this), buffer_segment(m_buffer_level));
             if(m_stack_top) {
                 ascend();
                 parse(c);
+                m_previous_char = c;
                 return;
             }
             JSONSTREAM_EXPECT_WHITESPACE(c);
             break;
         }
+        m_previous_char = c;
         return;
     case ValueTrue:
         parse_true(c);
@@ -641,10 +620,12 @@ void json::RawParser::parse(char c) {
             on_true(Path(this));
             if(m_stack_top) {
                 ascend();
+                m_previous_char = c;
                 return;
             }
             break;
         }
+        m_previous_char = c;
         return;
     case ValueFalse:
         parse_false(c);
@@ -653,10 +634,12 @@ void json::RawParser::parse(char c) {
             on_false(Path(this));
             if(m_stack_top) {
                 ascend();
+                m_previous_char = c;
                 return;
             }
             break;
         }
+        m_previous_char = c;
         return;
     case ValueNull:
         parse_null(c);
@@ -665,16 +648,20 @@ void json::RawParser::parse(char c) {
             on_null(Path(this));
             if(m_stack_top) {
                 ascend();
+                m_previous_char = c;
                 return;
             }
             break;
         }
+        m_previous_char = c;
         return;
     default:
         JSONSTREAM_ERROR(ErrorNotImplemented);
     }
     JSONSTREAM_FLAG_SET(JSONSTREAM_DOCUMENT_ENDED);
     TRIGGER_DOCUMENT_END(Value);
+
+    m_previous_char = c;
 }
 
 void json::RawParser::write(const char *data) {
@@ -697,11 +684,8 @@ void json::RawParser::end_of_transmission() {
     if(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_INVALID)) {
         return;
     }
-    parse('\n');
-
     JSONSTREAM_ASSERT(JSONSTREAM_FLAG_IS_SET(JSONSTREAM_DOCUMENT_ENDED),
                       ErrorDocumentNotClosed);
-
     reset();
 }
 
@@ -734,7 +718,7 @@ void json::Parser::on_number(const Path& path, const char *str) {
         if(str[0] == '-') {
             is_signed = 1;
         }
-        for(int8_t i = is_signed; i < m_buffer_sizes[m_buffer_level] - 1; ++i) {
+        for(int8_t i = is_signed; i < buffer_segment_length(m_buffer_level) - 1; ++i) {
             bool success = add_digit(&parsed_num, str[i] - '0');
 #ifdef JSONSTREAM_CHECK_OVERFLOWS
             JSONSTREAM_ASSERT(success, is_signed ?
@@ -755,7 +739,7 @@ void json::Parser::on_number(const Path& path, const char *str) {
         is_signed = 1;
     }
 
-    for(int8_t i = is_signed; i < m_buffer_sizes[m_buffer_level] - 1; ++i) {
+    for(int8_t i = is_signed; i < buffer_segment_length(m_buffer_level) - 1; ++i) {
         if(str[i] == '.') {
             part_idx = 1;
         } else if(str[i] == 'e' || str[i] == 'E') {
@@ -868,9 +852,8 @@ int json::Path::as_index(unsigned int i) const {
         return 0;
     }
 
-    if(m_parser->m_stack[i] == Array)
-    {
-        return *(int*)&m_parser->m_buffers[i][0];
+    if(m_parser->m_stack[i] == Array) {
+        return m_parser->buffer_segment_as_int(i);
     }
 
     return 0;
@@ -881,9 +864,8 @@ const char* json::Path::as_name(unsigned int i) const {
         return nullptr;
     }
 
-    if(m_parser->m_stack[i] == Object)
-    {
-        return m_parser->m_buffers[i];
+    if(m_parser->m_stack[i] == Object) {
+        return m_parser->buffer_segment(i);
     }
 
     return nullptr;
@@ -896,7 +878,7 @@ unsigned int json::Path::key_length(unsigned int i) const {
         return 0;
     }
 
-    return m_parser->m_buffer_sizes[i];
+    return m_parser->buffer_segment_length(i);
 }
 
 unsigned int json::Path::size() const {

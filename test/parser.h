@@ -188,28 +188,28 @@ public:
 
         switch(error_code) {
         case json::ErrorOutOfMemory:
-            BOOST_TEST_MESSAGE("- Error: Out of memory.");
+            output_data << "ERROR: Out of memory.\n";
             break;
         case json::ErrorUnexpectedCharacter:
-            BOOST_TEST_MESSAGE(" - Error: Unexpected character.");
+            output_data << "ERROR: Unexpected character.\n";
             break;
         case json::ErrorStackEmpty:
-            BOOST_TEST_MESSAGE(" - Error: Stack is empty.");
+            output_data << "ERROR: Stack is empty.\n";
             break;
         case json::ErrorBufferEmpty:
-            BOOST_TEST_MESSAGE(" - Error: Buffer is empty.");
+            output_data << "ERROR: Buffer is empty.\n";
             break;
         case json::ErrorNotImplemented:
-            BOOST_TEST_MESSAGE(" - Error: Not implemented.");
+            output_data << "ERROR: Not implemented.\n";
             break;
         case json::ErrorUnknownEscapeCharacter:
-            BOOST_TEST_MESSAGE(" - Error: Unknown escape character.");
+            output_data << "ERROR: Unknown escape character.\n";
             break;
         case json::ErrorDocumentNotClosed:
-            BOOST_TEST_MESSAGE(" - Error: Document not closed.");
+            output_data << "ERROR: Document not closed.\n";
             break;
         default:
-            break;
+            output_data << "ERROR: other.\n";
         }
     }
 
@@ -288,18 +288,18 @@ public:
 			}
 
 			if(i <= m_buffer_level) {
-				if(m_buffer_sizes[i] == sizeof(int) &&
-				m_buffers[i][sizeof(int) - 1] == '\0')
-				{
-					int *data = (int*)&m_buffers[i][0];
-					printf(" | (int): %d\n",
-						*data);
-				} else {
-					printf(" | %4d: %.*s\n", 
-						m_buffer_sizes[i],
-						m_buffer_sizes[i],
-						m_buffers[i]);
-				}
+				// if(m_buffer_sizes[i] == sizeof(int) &&
+				// m_buffers[i][sizeof(int) - 1] == '\0')
+				// {
+				// 	int *data = (int*)&m_buffers[i][0];
+				// 	printf(" | (int): %d\n",
+				// 		*data);
+				// } else {
+				// 	printf(" | %4d: %.*s\n", 
+				// 		m_buffer_sizes[i],
+				// 		m_buffer_sizes[i],
+				// 		m_buffers[i]);
+				// }
 			} else {
 				printf("\n");
 			}
