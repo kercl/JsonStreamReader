@@ -194,8 +194,8 @@ void json::RawParser::parse_object(char c) {
                 TRIGGER_OBJECT_END(Path(this));
                 TRIGGER_DOCUMENT_END(Object);
             } else {
-                ascend();
                 TRIGGER_OBJECT_END(Path(this));
+                ascend();
             }
             return;
         }
@@ -240,8 +240,8 @@ void json::RawParser::parse_array(char c) {
             TRIGGER_ARRAY_END(Path(this));
             TRIGGER_DOCUMENT_END(Array);
         } else {
-            ascend();
             TRIGGER_ARRAY_END(Path(this));
+            ascend();
         }
         return;
     }
@@ -878,5 +878,5 @@ unsigned int json::Path::size() const {
     if(m_parser->m_parse_flags & JSONSTREAM_DOCUMENT_ENDED) {
         return 0;
     }
-    return m_parser->m_buffer_level + 1;
+    return m_parser->m_buffer_level;
 }
