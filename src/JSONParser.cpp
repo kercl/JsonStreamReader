@@ -129,7 +129,7 @@ int json::RawParser::buffer_segment_as_int(unsigned int i) const {
     return *(int*)&m_buffer[m_buffer_segments[i]];
 }
 
-const char* json::RawParser::buffer_segment(uint i) const {
+const char* json::RawParser::buffer_segment(unsigned int i) const {
     return &m_buffer[m_buffer_segments[i]];
 }
 
@@ -683,7 +683,7 @@ void json::RawParser::end_of_transmission() {
 }
 
 
-bool json::Parser::add_digit(int *number, uint8_t digit) {
+bool json::Parser::add_digit(int32_t *number, uint8_t digit) {
 #ifdef JSONSTREAM_CHECK_OVERFLOWS
     if(*number > INT_MAX / 10) {
         return false;
@@ -707,7 +707,7 @@ void json::Parser::on_number(const Path& path, const char *str) {
     if(!JSONSTREAM_FLAG_IS_SET(JSONSTREAM_NUM_HAS_COMMA) &&
        !JSONSTREAM_FLAG_IS_SET(JSONSTREAM_NUM_IS_EXP))
     {
-        int parsed_num = 0;
+        int32_t parsed_num = 0;
         if(str[0] == '-') {
             is_signed = 1;
         }
